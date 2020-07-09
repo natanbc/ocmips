@@ -1,0 +1,86 @@
+//my java 8 build reports the version as `1.8.0-internal`, which fails forge's version check
+//(it checks for >= 1.8.0_101), but since my jdk is based on a newer version of java 8, it's safe
+//to disable this check.
+System.setProperty("net.minecraftforge.gradle.test_java", "false")
+
+buildscript {
+    repositories {
+        maven { url = 'https://files.minecraftforge.net/maven' }
+        jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:3.+'
+    }
+}
+        
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'eclipse'
+apply plugin: 'maven-publish'
+
+version = '1.0'
+group = 'com.github.natanbc'
+archivesBaseName = 'ocmips'
+
+sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility =
+        compileJava.targetCompatibility = '1.8'
+
+minecraft {
+    mappings channel: 'snapshot', version: '20180814-1.12'
+
+    runs {
+        client {
+            workingDirectory project.file('run/client')
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+        }
+
+        server {
+            workingDirectory project.file('run/server')
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+        }
+    }
+}
+
+repositories {
+    maven { url = "http://maven.cil.li/" }
+}
+
+def ocVersion = "MC1.12.2-1.7.5.212"
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2854'
+
+    compile "li.cil.oc:OpenComputers:$ocVersion:api"
+    compile project(':mips-cpu')
+}
+
+jar {
+    manifest {
+        attributes([
+            "Specification-Title": "ocmips",
+            "Specification-Vendor": "natanbc,DarkRyu550",
+            "Specification-Version": "1",
+            "Implementation-Title": project.name,
+            "Implementation-Version": "${version}",
+            "Implementation-Vendor" :"natanbc,DarkRyu550",
+            "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+}
+
+jar.finalizedBy('reobfJar')
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file:///${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
