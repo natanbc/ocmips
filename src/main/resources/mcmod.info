@@ -1,0 +1,16 @@
+[
+{
+  "modid": "ocmips",
+  "name": "OC MIPS",
+  "description": "Adds a monocycle MIPS architecture to OpenComputers",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "https://github.com/natanbc/ocmips",
+  "updateUrl": "https://github.com/natanbc/ocmips/releases",
+  "authorList": ["natanbc", "DarkRyu550"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": ["opencomputers"]
+}
+]
