@@ -52,7 +52,7 @@ public class BSOD {
         drawSquare(machine, gpu, x+6, y);
         drawSquare(machine, gpu, x, y);
         drawSquare(machine, gpu, x+5, y+1);
-        drawSquare(machine, gpu, x+4, y+2);
+        drawSquare(machine, gpu, x+5, y+2);
         drawSquare(machine, gpu, x+5, y+3);
         drawSquare(machine, gpu, x, y+4);
         drawSquare(machine, gpu, x+6, y+4);
