@@ -48,15 +48,15 @@ public class BSOD {
     }
     
     private static void drawSadFace(Machine machine, String gpu, int x, int y) throws Exception {
-        drawSquare(machine, gpu, x+7, y-1);
-        drawSquare(machine, gpu, x+6, y);
+        drawSquare(machine, gpu, x+6, y-1);
+        drawSquare(machine, gpu, x+5, y);
         drawSquare(machine, gpu, x, y);
-        drawSquare(machine, gpu, x+5, y+1);
-        drawSquare(machine, gpu, x+5, y+2);
-        drawSquare(machine, gpu, x+5, y+3);
+        drawSquare(machine, gpu, x+4, y+1);
+        drawSquare(machine, gpu, x+4, y+2);
+        drawSquare(machine, gpu, x+4, y+3);
         drawSquare(machine, gpu, x, y+4);
-        drawSquare(machine, gpu, x+6, y+4);
-        drawSquare(machine, gpu, x+7, y+5);
+        drawSquare(machine, gpu, x+5, y+4);
+        drawSquare(machine, gpu, x+6, y+5);
     }
     
     private static void drawSquare(Machine machine, String gpu, int x, int y) throws Exception {
