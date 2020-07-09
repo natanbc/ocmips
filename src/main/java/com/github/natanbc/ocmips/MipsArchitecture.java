@@ -9,6 +9,7 @@ import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.mipscpu.memory.MemoryMap;
 import com.github.natanbc.ocmips.handlers.CleanableHandler;
 import com.github.natanbc.ocmips.handlers.FramebufferHandler;
+import com.github.natanbc.ocmips.utils.BSOD;
 import li.cil.oc.api.Driver;
 import li.cil.oc.api.driver.DriverItem;
 import li.cil.oc.api.driver.item.Memory;
@@ -44,6 +45,7 @@ public class MipsArchitecture implements Architecture {
     private MipsCPU cpu;
     private boolean booted;
     private volatile ExecutionResult queuedResult;
+    private boolean crashed;
 
     private String gpuAddress, screenAddress;
 
@@ -76,9 +78,9 @@ public class MipsArchitecture implements Architecture {
 
     @Override
     public boolean initialize() {
-        log("Initializing CPU");
         cpu = new MipsCPU(BOOTROM);
         booted = false;
+        crashed = false;
         cpu.setSyscallHandler(cpu -> {
             switch (cpu.registers().readInteger(MipsRegisters.V0)) {
                 //sleep
@@ -139,9 +141,11 @@ public class MipsArchitecture implements Architecture {
         if(!booted) {
             try {
                 boot();
-                booted = true;
+                if(!crashed) {
+                    booted = true;
+                }
             } catch (Exception e) {
-                bsod("Unable to boot: " + (e.getMessage() == null ? e.toString() : e.getMessage()));
+                bsod("ERR_FAIL_BOOT");
             }
             return;
         }
@@ -160,6 +164,9 @@ public class MipsArchitecture implements Architecture {
 
     @Override
     public ExecutionResult runThreaded(boolean isSynchronizedReturn) {
+        if(crashed) {
+            return new ExecutionResult.Sleep(100);
+        }
         updateRam();
         ExecutionResult r = queuedResult;
         queuedResult = null;
@@ -242,7 +249,7 @@ public class MipsArchitecture implements Architecture {
             machine.invoke(gpuAddress, "set", new Object[]{1, h, "BOOT TEST STRING"});
         }
         if(eepromAddress == null) {
-            bsod("No eeprom found!");
+            bsod("ERR_NO_EEPROM");
             return;
         }
         Object[] eepromData = machine.invoke(eepromAddress, "get", new Object[0]);
@@ -253,7 +260,7 @@ public class MipsArchitecture implements Architecture {
             int[] program = new int[data.remaining()];
             data.get(program);
             if(ramWords < program.length) {
-                bsod("Not enough RAM for eeprom data: " + program.length + " words needed, " + ramWords + " available");
+                bsod("ERR_NO_MEM");
                 return;
             }
             System.arraycopy(program, 0, getRAM(), 0, program.length);
@@ -262,25 +269,12 @@ public class MipsArchitecture implements Architecture {
 
     private void bsod(String msg) {
         try {
-            if (gpuAddress != null) {
-                machine.invoke(gpuAddress, "setForeground", new Object[]{0xFFFFFF, false});
-                machine.invoke(gpuAddress, "setBackground", new Object[]{0x0000FF, false});
-                Object[] gpuSizeO = machine.invoke(gpuAddress, "getResolution",
-                        new Object[]{});
-                int w = 40;
-                int h = 16;
-                if (gpuSizeO != null && gpuSizeO.length >= 1 && gpuSizeO[0] instanceof Integer)
-                    w = (Integer) gpuSizeO[0];
-                if (gpuSizeO != null && gpuSizeO.length >= 2 && gpuSizeO[1] instanceof Integer)
-                    h = (Integer) gpuSizeO[1];
-                machine.invoke(gpuAddress, "fill", new Object[]{1, 1, w, h, " "});
-                machine.invoke(gpuAddress, "set", new Object[]{w / 2 + 1 - 6, h / 2 - 1, "FATAL ERROR:"});
-                machine.invoke(gpuAddress, "set", new Object[]{w / 2 + 1 - msg.length() / 2, h / 2 + 1, msg});
-            }
-        } catch (Exception e) {
-            log("Failed BSOD: " + (e.getMessage() == null ? e.toString() : e.getMessage()));
+            BSOD.draw(machine, gpuAddress, msg);
+        } catch(Exception e) {
+            log("Failed to BSOD: " + e);
+            e.printStackTrace();
         }
-        queuedResult = new ExecutionResult.Error(msg);
+        crashed = true;
     }
 
     private int[] getRAM() {
