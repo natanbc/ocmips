@@ -24,6 +24,7 @@ class MipsDecoder {
             case 0b100100: return new And(rd, rs, rt);
             case 0b011010: return new Div(rs, rt);
             case 0b011011: return new Divu(rs, rt);
+            case 0b001001: return new Jalr(rs, rd);
             case 0b001000: return new Jr(rs);
             case 0b010000: return new Mfhi(rd);
             case 0b010010: return new Mflo(rd);

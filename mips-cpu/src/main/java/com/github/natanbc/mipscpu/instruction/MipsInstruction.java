@@ -397,6 +397,27 @@ public interface MipsInstruction {
         }
     }
 
+    class Jalr implements MipsInstruction {
+        private final int s, d;
+
+        public Jalr(int s, int d) {
+            this.s = s;
+            this.d = d;
+        }
+
+        @Override
+        public void execute(MipsCPU cpu) {
+            int temp = cpu.registers().readInteger(s);
+            cpu.registers().writeInteger(d, cpu.registers().readInteger(PC) + 8);
+            cpu.registers().writeInteger(PC, temp);
+        }
+
+        @Override
+        public String toString() {
+            return "jalr $" + s + ", $" + d;
+        }
+    }
+
     class Jr implements MipsInstruction {
         private final int s;
 
@@ -590,7 +611,7 @@ public interface MipsInstruction {
 
         @Override
         public String toString() {
-            return "or $" + t + ", $" + s + ", " + imm;
+            return "ori $" + t + ", $" + s + ", " + imm;
         }
     }
 
@@ -650,7 +671,7 @@ public interface MipsInstruction {
 
         @Override
         public String toString() {
-            return "sll $" + d + ", $" + t + ", $" + s;
+            return "sllv $" + d + ", $" + t + ", $" + s;
         }
     }
 
@@ -787,7 +808,7 @@ public interface MipsInstruction {
 
         @Override
         public String toString() {
-            return "sra $" + d + ", $" + t + ", " + h;
+            return "srl $" + d + ", $" + t + ", " + h;
         }
     }
 
@@ -885,8 +906,9 @@ public interface MipsInstruction {
             }
             try {
                 h.handleSyscall(cpu);
-            } finally {
+            } catch (RuntimeException e) {
                 cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4);
+                throw e;
             }
         }
 
