@@ -11,6 +11,7 @@ import org.apache.commons.compress.utils.IOUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
 @Mod(modid = "ocmips", name = "OCMIPS",
@@ -20,6 +21,7 @@ import java.nio.IntBuffer;
 public class OCMips {
     private static byte[] badApple;
     private static IntBuffer badAppleBuffer;
+    static int[] BOOTROM;
     
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent ev) throws IOException {
@@ -28,6 +30,14 @@ public class OCMips {
             if(is == null) throw new AssertionError("badapple.bin not found");
             badApple = IOUtils.toByteArray(is);
             badAppleBuffer = ByteBuffer.wrap(badApple).asIntBuffer();
+        }
+        try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
+            if(is == null) throw new AssertionError("bootrom.bin not found");
+            IntBuffer data = ByteBuffer.wrap(IOUtils.toByteArray(is))
+                    .order(ByteOrder.BIG_ENDIAN)
+                    .asIntBuffer();
+            BOOTROM = new int[data.remaining()];
+            data.get(BOOTROM);
         }
     }
     
