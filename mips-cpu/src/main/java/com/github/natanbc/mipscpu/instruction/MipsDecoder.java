@@ -48,33 +48,39 @@ class MipsDecoder {
     private static MipsInstruction decodeI(int instruction) {
         int rs =  (instruction <<  6) >>> 27;
         int rt =  (instruction << 11) >>> 27;
-        int imm = (instruction << 16) >>> 16;
+        int imm = instruction & 0xFFFF;
+        //andi, ori, xori must NOT be sign extended
+        //addi[u], lw, sw, relative branches, slti[u] must be sign extended
         switch (instruction >>> 26) {
-            case 0b001000: return new Addi(rt, rs, imm);
-            case 0b001001: return new Addiu(rt, rs, imm);
+            case 0b001000: return new Addi(rt, rs, signExtend(imm));
+            case 0b001001: return new Addiu(rt, rs, signExtend(imm));
             case 0b001100: return new Andi(rt, rs, imm);
-            case 0b000100: return new Beq(rs, rt, imm);
+            case 0b000100: return new Beq(rs, rt, signExtend(imm));
             case 0b000001:
                 switch(rt) {
-                    case 0b00001: return new Bgez(rs, imm);
-                    case 0b10001: return new Bgezal(rs, imm);
-                    case 0b00000: return new Bltz(rs, imm);
-                    case 0b10000: return new Bltzal(rs, imm);
+                    case 0b00001: return new Bgez(rs, signExtend(imm));
+                    case 0b10001: return new Bgezal(rs, signExtend(imm));
+                    case 0b00000: return new Bltz(rs, signExtend(imm));
+                    case 0b10000: return new Bltzal(rs, signExtend(imm));
                     default: return new Invalid(instruction, "Unknown branch type " + Integer.toBinaryString(rt));
                 }
-            case 0b000111: return new Bgtz(rs, imm);
-            case 0b000110: return new Blez(rs, imm);
-            case 0b000101: return new Bne(rs, rt, imm);
-            case 0b100000: return new Lb(rt, imm, rs);
+            case 0b000111: return new Bgtz(rs, signExtend(imm));
+            case 0b000110: return new Blez(rs, signExtend(imm));
+            case 0b000101: return new Bne(rs, rt, signExtend(imm));
+            case 0b100000: return new Lb(rt, signExtend(imm), rs);
             case 0b001111: return new Lui(rt, imm);
-            case 0b100011: return new Lw(rt, imm, rs);
+            case 0b100011: return new Lw(rt, signExtend(imm), rs);
             case 0b001101: return new Ori(rt, rs, imm);
-            case 0b101000: return new Sb(rt, imm, rs);
-            case 0b001010: return new Slti(rt, rs, imm);
-            case 0b001011: return new Sltiu(rt, rs, imm);
-            case 0b101011: return new Sw(rt, imm, rs);
+            case 0b101000: return new Sb(rt, signExtend(imm), rs);
+            case 0b001010: return new Slti(rt, rs, signExtend(imm));
+            case 0b001011: return new Sltiu(rt, rs, signExtend(imm));
+            case 0b101011: return new Sw(rt, signExtend(imm), rs);
             case 0b001110: return new Xori(rt, rs, imm);
             default: return new Invalid(instruction, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
         }
+    }
+    
+    private static int signExtend(int imm) {
+        return (short)imm;
     }
 }
