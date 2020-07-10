@@ -13,7 +13,7 @@ public class MipsCPU {
     private static final int BYTE_MASK = 0b11;
     private static final int WORD_MASK = ~BYTE_MASK;
 
-    private final SortedMap<Integer, MemoryHandler> memoryHandlers = new TreeMap<>();
+    private final SortedMap<Integer, MemoryHandler> memoryHandlers = new TreeMap<>(Integer::compareUnsigned);
     private final MipsRegisters registers = new MipsRegisters();
     private final int[] bootRom;
     private int[] memory;
