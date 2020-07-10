@@ -44,6 +44,10 @@ public class MipsCPU {
         return syscallHandler;
     }
 
+    public SortedMap<Integer, MemoryHandler> memoryHandlers() {
+        return memoryHandlers;
+    }
+
     public void addMemoryHandler(int baseAddress, MemoryHandler handler) {
         memoryHandlers.put(baseAddress, handler);
         handler.onAttach(this, baseAddress);
@@ -111,25 +115,25 @@ public class MipsCPU {
         throw notMapped(address);
     }
 
-    private boolean isRAM(int address) {
-        return memory != null && address >= MemoryMap.RAM_START && address < MemoryMap.RAM_START + (memory.length * 4);
-    }
-
-    private boolean isBootRom(int address) {
-        return address >= MemoryMap.BOOT_ROM_START && address < MemoryMap.BOOT_ROM_START + (bootRom.length * 4);
-    }
-
-    private MemoryHandler handlerFor(int address) {
+    public MemoryHandler handlerFor(int address) {
         SortedMap<Integer, MemoryHandler> map = memoryHandlers.headMap(address+1);
         if(map.isEmpty()) {
             return null;
         }
         Integer last = map.lastKey();
         MemoryHandler handler = map.get(map.lastKey());
-        if(handler == null || address > last + handler.memorySize()) {
+        if(handler == null || Integer.compareUnsigned(address, last + handler.memorySize()) > 0) {
             return null;
         }
         return handler;
+    }
+
+    private boolean isRAM(int address) {
+        return memory != null && address >= MemoryMap.RAM_START && address < MemoryMap.RAM_START + (memory.length * 4);
+    }
+
+    private boolean isBootRom(int address) {
+        return address >= MemoryMap.BOOT_ROM_START && address < MemoryMap.BOOT_ROM_START + (bootRom.length * 4);
     }
 
     private static MemoryOperationException notMapped(int address) {
