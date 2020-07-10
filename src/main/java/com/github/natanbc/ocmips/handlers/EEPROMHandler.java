@@ -7,6 +7,7 @@ import li.cil.oc.api.machine.Machine;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.Arrays;
 
 //struct eeprom_t {
 // word sync;
@@ -56,7 +57,7 @@ public class EEPROMHandler implements MemoryHandler {
         if(offset < size) {
             return content(address).buffer.get(offset / 4);
         } else {
-            return data(address).buffer.get(offset / 4);
+            return data(address).buffer.get((offset - size) / 4);
         }
     }
     
@@ -85,7 +86,7 @@ public class EEPROMHandler implements MemoryHandler {
         if(offset < size) {
             content(address).buffer.put(offset / 4, value);
         } else {
-            data(address).buffer.put(offset / 4, value);
+            data(address).buffer.put((offset - size) / 4, value);
         }
     }
     
@@ -97,14 +98,14 @@ public class EEPROMHandler implements MemoryHandler {
     
     private CachedData content(int address) throws MemoryOperationException {
         if(content == null) {
-            content = new CachedData(read(address, "get"));
+            content = new CachedData(withSize(read(address, "get"), size));
         }
         return content;
     }
     
     private CachedData data(int address) throws MemoryOperationException {
         if(data == null) {
-            data = new CachedData(read(address, "getData"));
+            data = new CachedData(withSize(read(address, "getData"), dataSize));
         }
         return data;
     }
@@ -125,6 +126,13 @@ public class EEPROMHandler implements MemoryHandler {
         } catch(Exception e) {
             throw new MemoryOperationException(base, MemoryOperationException.Reason.ACCESS_ERROR);
         }
+    }
+
+    private static byte[] withSize(byte[] array, int size) {
+        if(array.length != size) {
+            return Arrays.copyOf(array, size);
+        }
+        return array;
     }
     
     private static class CachedData {
