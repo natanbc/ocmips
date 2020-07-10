@@ -26,6 +26,22 @@ public class FramebufferHandler implements CleanableHandler {
         this.bufferNumber = bufferNumber;
     }
 
+    public String getGpuAddress() {
+        return gpuAddress;
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
+    public int getBufferNumber() {
+        return bufferNumber;
+    }
+
     @Override
     public void onAttach(MipsCPU cpu, int baseAddress) {
         this.base = baseAddress;

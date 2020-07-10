@@ -5,9 +5,11 @@ import com.github.natanbc.mipscpu.MipsException;
 import com.github.natanbc.mipscpu.MipsRegisters;
 import com.github.natanbc.mipscpu.instruction.MipsInstruction;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
+import com.github.natanbc.ocmips.handlers.BadAppleHandler;
 import com.github.natanbc.ocmips.handlers.CleanableHandler;
 import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
 import com.github.natanbc.ocmips.utils.BSOD;
+import com.github.natanbc.ocmips.utils.HandlerSerialization;
 import com.github.natanbc.ocmips.utils.MemoryUtils;
 import com.github.natanbc.ocmips.utils.SpecialComponentMapper;
 import li.cil.oc.api.Driver;
@@ -69,88 +71,15 @@ public class MipsArchitecture implements Architecture {
 
     @Override
     public boolean initialize() {
-        cpu = new MipsCPU(OCMips.BOOTROM);
+        cpu = createCPU(null);
         crashed = false;
-        MemoryHandler badApple = OCMips.badApple();
-        if(badApple != null) {
-            cpu.addMemoryHandler(0x13370000, badApple);
-        }
-        cpu.setSyscallHandler(cpu -> {
-            switch (cpu.registers().readInteger(MipsRegisters.V0)) {
-                //sleep
-                case 1: throw new StopExecution(new ExecutionResult.Sleep(
-                        cpu.registers().readInteger(MipsRegisters.A0)
-                ));
-                //shutdown
-                case 2: throw new StopExecution(new ExecutionResult.Shutdown(
-                        cpu.registers().readInteger(MipsRegisters.A0) != 0
-                ));
-                //map special component
-                case 3: {
-                    SpecialComponentMapper.map(machine, cpu);
-                    return;
-                }
-                //unmap region
-                case 4: {
-                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
-                    MemoryHandler m = cpu.removeMemoryHandler(addr);
-                    if(m == null) return;
-                    if(m instanceof CleanableHandler) {
-                        ((CleanableHandler)m).cleanup(cpu);
-                    }
-                    return;
-                }
-                //map component call
-                case 5: {
-                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
-                    String component = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A1));
-                    String method = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A2));
-                    int maxArg = cpu.registers().readInteger(MipsRegisters.A3);
-                    cpu.addMemoryHandler(addr, new ComponentCallHandler(machine, component, method, maxArg));
-                    return;
-                }
-                //find Nth component by type
-                case 6: {
-                    String type = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A0));
-                    int which = cpu.registers().readInteger(MipsRegisters.A1);
-                    int addr = cpu.registers().readInteger(MipsRegisters.A2);
-                    Optional<String> component = machine.components().entrySet()
-                            .stream()
-                            .filter(e -> e.getValue().equals(type))
-                            .map(Map.Entry::getKey)
-                            .sorted()
-                            .skip(which)
-                            .findFirst();
-                    if(component.isPresent()) {
-                        IntBuffer buffer = MemoryUtils.toBuffer(UUID.fromString(component.get()));
-                        for(int i = 0; i < buffer.capacity(); i++) {
-                            cpu.writeWord(addr + i * 4, buffer.get(i));
-                        }
-                        cpu.registers().writeInteger(MipsRegisters.V0, 0);
-                    } else {
-                        cpu.registers().writeInteger(MipsRegisters.V0, 1);
-                    }
-                    return;
-                }
-                case 7: {
-                    String addr = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A0));
-                    String msg = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A1));
-                    if(addr == null) {
-                        queuedResult = new ExecutionResult.Error(msg);
-                    } else {
-                        bsod(addr, msg);
-                    }
-                    throw new RetryInNextTick();
-                }
-                default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
-            }
-        });
         return true;
     }
 
     @Override
     public void close() {
-
+        cpu = null;
+        crashed = false;
     }
 
     @Override
@@ -210,10 +139,34 @@ public class MipsArchitecture implements Architecture {
     }
 
     @Override
-    public void load(NBTTagCompound tag) {}
+    public void load(NBTTagCompound tag) {
+        if(tag.getBoolean("mips_powered_on")) {
+            crashed = tag.getBoolean("crashed");
+            cpu = createCPU(tag.getIntArray("mips_boot_rom"));
+            cpu.setRAM(tag.getIntArray("mips_ram"));
+            int[] regs = tag.getIntArray("mips_registers");
+            for(int i = 0; i < regs.length; i++) {
+                cpu.registers().writeInteger(i, regs[i]);
+            }
+            HandlerSerialization.deserializeHandlers(machine, cpu, tag);
+        }
+    }
 
     @Override
-    public void save(NBTTagCompound tag) {}
+    public void save(NBTTagCompound tag) {
+        if(cpu != null) {
+            tag.setBoolean("mips_powered_on", true);
+            tag.setBoolean("crashed", crashed);
+            tag.setIntArray("mips_boot_rom", OCMips.BOOTROM);
+            tag.setIntArray("mips_ram", cpu.getRAM());
+            int[] regs = new int[MipsRegisters.INTEGER_COUNT];
+            for(int i = 0; i < regs.length; i++) regs[i] = cpu.registers().readInteger(i);
+            tag.setIntArray("mips_registers", regs);
+            HandlerSerialization.serializeHandlers(cpu, tag);
+        } else {
+            tag.setBoolean("mips_powered_on", false);
+        }
+    }
 
     private void updateRam() {
         if(cpu != null) {
@@ -235,6 +188,83 @@ public class MipsArchitecture implements Architecture {
             queuedResult = new ExecutionResult.Error(msg);
         }
         crashed = true;
+    }
+
+    private MipsCPU createCPU(int[] bootrom) {
+        if(bootrom == null) bootrom = OCMips.BOOTROM;
+        MipsCPU c = new MipsCPU(bootrom);
+        c.addMemoryHandler(0x13370000, new BadAppleHandler());
+        c.setSyscallHandler(cpu -> {
+            switch (cpu.registers().readInteger(MipsRegisters.V0)) {
+                //sleep
+                case 1: throw new StopExecution(new ExecutionResult.Sleep(
+                        cpu.registers().readInteger(MipsRegisters.A0)
+                ));
+                    //shutdown
+                case 2: throw new StopExecution(new ExecutionResult.Shutdown(
+                        cpu.registers().readInteger(MipsRegisters.A0) != 0
+                ));
+                    //map special component
+                case 3: {
+                    SpecialComponentMapper.map(machine, cpu);
+                    return;
+                }
+                //unmap region
+                case 4: {
+                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
+                    MemoryHandler m = cpu.removeMemoryHandler(addr);
+                    if(m == null) return;
+                    if(m instanceof CleanableHandler) {
+                        ((CleanableHandler)m).cleanup(cpu);
+                    }
+                    return;
+                }
+                //map component call
+                case 5: {
+                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
+                    String component = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A1));
+                    String method = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A2));
+                    int maxArg = cpu.registers().readInteger(MipsRegisters.A3);
+                    cpu.addMemoryHandler(addr, new ComponentCallHandler(machine, component, method, maxArg));
+                    return;
+                }
+                //find Nth component by type
+                case 6: {
+                    String type = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A0));
+                    int which = cpu.registers().readInteger(MipsRegisters.A1);
+                    int addr = cpu.registers().readInteger(MipsRegisters.A2);
+                    Optional<String> component = machine.components().entrySet()
+                            .stream()
+                            .filter(e -> e.getValue().equals(type))
+                            .map(Map.Entry::getKey)
+                            .sorted()
+                            .skip(which)
+                            .findFirst();
+                    if(component.isPresent()) {
+                        IntBuffer buffer = MemoryUtils.toBuffer(UUID.fromString(component.get()));
+                        for(int i = 0; i < buffer.capacity(); i++) {
+                            cpu.writeWord(addr + i * 4, buffer.get(i));
+                        }
+                        cpu.registers().writeInteger(MipsRegisters.V0, 0);
+                    } else {
+                        cpu.registers().writeInteger(MipsRegisters.V0, 1);
+                    }
+                    return;
+                }
+                case 7: {
+                    String addr = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A0));
+                    String msg = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A1));
+                    if(addr == null) {
+                        queuedResult = new ExecutionResult.Error(msg);
+                    } else {
+                        bsod(addr, msg);
+                    }
+                    throw new RetryInNextTick();
+                }
+                default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
+            }
+        });
+        return c;
     }
 
     private static void log(String msg) {

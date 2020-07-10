@@ -4,6 +4,7 @@ import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import li.cil.oc.api.machine.Machine;
+import net.minecraft.nbt.NBTTagCompound;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
@@ -33,7 +34,43 @@ public class EEPROMHandler implements MemoryHandler {
         this.size = size;
         this.dataSize = dataSize;
     }
-    
+
+    public String getEepromAddress() {
+        return eepromAddress;
+    }
+
+    public int getSize() {
+        return size;
+    }
+
+    public int getDataSize() {
+        return dataSize;
+    }
+
+    public void save(NBTTagCompound tag) {
+        tag.setBoolean("dirty", dirty);
+        if(dirty) {
+            if(content != null) {
+                tag.setByteArray("content", content.array);
+            }
+            if(data != null) {
+                tag.setByteArray("data", data.array);
+            }
+        }
+    }
+
+    public void restore(NBTTagCompound tag) {
+        dirty = tag.getBoolean("dirty");
+        if(dirty) {
+            if(tag.hasKey("content")) {
+                content = new CachedData(tag.getByteArray("content"));
+            }
+            if(tag.hasKey("data")) {
+                data = new CachedData(tag.getByteArray("data"));
+            }
+        }
+    }
+
     @Override
     public void onAttach(MipsCPU cpu, int baseAddress) {
         this.base = baseAddress;

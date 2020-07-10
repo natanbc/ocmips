@@ -5,6 +5,7 @@ import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.ocmips.utils.MemoryUtils;
 import li.cil.oc.api.machine.Machine;
+import net.minecraft.nbt.NBTTagCompound;
 
 import java.nio.IntBuffer;
 import java.util.UUID;
@@ -46,7 +47,28 @@ public class ComponentCallHandler implements MemoryHandler {
         this.maxArg = maxArg;
         this.memory = new int[maxArg * 2 + IDX_ARGS];
     }
-    
+
+    public String getComponentAddress() {
+        return componentAddress;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public int getMaxArg() {
+        return maxArg;
+    }
+
+    public void save(NBTTagCompound tag) {
+        tag.setIntArray("memory", memory);
+    }
+
+    public void restore(NBTTagCompound tag) {
+        int[] m = tag.getIntArray("memory");
+        System.arraycopy(m, 0, memory, 0, m.length);
+    }
+
     @Override
     public void onAttach(MipsCPU cpu, int baseAddress) {
         this.base = baseAddress;

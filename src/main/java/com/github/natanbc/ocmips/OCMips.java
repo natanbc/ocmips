@@ -1,8 +1,5 @@
 package com.github.natanbc.ocmips;
 
-import com.github.natanbc.mipscpu.MipsCPU;
-import com.github.natanbc.mipscpu.memory.MemoryHandler;
-import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import li.cil.oc.api.Machine;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
@@ -19,8 +16,7 @@ import java.nio.IntBuffer;
         dependencies = "required-after:opencomputers@[1.7.0,)"
 )
 public class OCMips {
-    private static byte[] badApple;
-    private static IntBuffer badAppleBuffer;
+    public static IntBuffer badAppleBuffer;
     static int[] BOOTROM;
     
     @Mod.EventHandler
@@ -28,7 +24,7 @@ public class OCMips {
         Machine.add(MipsArchitecture.class);
         try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/badapple.bin")) {
             if(is == null) throw new AssertionError("badapple.bin not found");
-            badApple = IOUtils.toByteArray(is);
+            byte[] badApple = IOUtils.toByteArray(is);
             badAppleBuffer = ByteBuffer.wrap(badApple).asIntBuffer();
         }
         try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
@@ -39,32 +35,5 @@ public class OCMips {
             BOOTROM = new int[data.remaining()];
             data.get(BOOTROM);
         }
-    }
-    
-    public static MemoryHandler badApple() {
-        if(badApple == null) return null;
-        return new MemoryHandler() {
-            private int base;
-    
-            @Override
-            public void onAttach(MipsCPU cpu, int baseAddress) {
-                this.base = baseAddress;
-            }
-    
-            @Override
-            public int read(MipsCPU cpu, int address) {
-                return badAppleBuffer.get((address - base) / 4);
-            }
-    
-            @Override
-            public void write(MipsCPU cpu, int address, int value) throws MemoryOperationException {
-                throw new MemoryOperationException(address, MemoryOperationException.Reason.READ_ONLY);
-            }
-    
-            @Override
-            public int memorySize() {
-                return badApple.length;
-            }
-        };
     }
 }
