@@ -1,6 +1,9 @@
 #include "rt.h"
 
-MEMORY_MAP(eeprom_t,           eeprom, 0x80000000-__builtin_offsetof(eeprom_t, __internal)+4);
+static const int EEPROM_MAP_ADDR = 0x80000000
+                                   - __builtin_offsetof(eeprom_t, __internal)
+                                   + 4;
+MEMORY_MAP(eeprom_t,           eeprom, EEPROM_MAP_ADDR);
 MEMORY_MAP(component_method_t, method, 0x88000000); //only one may be active at a time
 MEMORY_MAP(framebuffer_t,      fb,     0x88000000); //only one may be active at a time
 
@@ -60,8 +63,8 @@ int main() {
     beep();
     address_t screen;
     address_t gpu;
-    int has_gpu = rt_find_component("gpu", 0, &gpu);
-    int has_screen = rt_find_component("screen", 0, &screen);
+    int has_gpu = rt_find_component("gpu", 0, &gpu) == 0;
+    int has_screen = rt_find_component("screen", 0, &screen) == 0;
     if(has_gpu && has_screen) {
         invoke1(&gpu, "bind", TYPE_ADDRESS, (int)&screen);
     }
@@ -74,10 +77,10 @@ int main() {
     }
     address_t addr;
     if(rt_find_component("eeprom", 0, &addr) != 0) {
-        rt_bsod(&gpu, "ERR_NO_EEPROM");
+        rt_bsod(has_gpu ? &gpu : 0, "ERR_NO_EEPROM");
     }
     if(rt_map_eeprom(eeprom, &addr) != 0) {
-        rt_bsod(&gpu, "ERR_EEPROM_MAP_FAIL");
+        rt_bsod(has_gpu ? &gpu : 0, "ERR_EEPROM_MAP_FAIL");
     }
     ((void(*)())rt_get_eeprom_content(eeprom))();
 }

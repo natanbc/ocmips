@@ -122,11 +122,11 @@ public class MipsArchitecture implements Architecture {
                             .skip(which)
                             .findFirst();
                     if(component.isPresent()) {
-                        cpu.registers().writeInteger(MipsRegisters.V0, 0);
                         IntBuffer buffer = MemoryUtils.toBuffer(UUID.fromString(component.get()));
                         for(int i = 0; i < buffer.capacity(); i++) {
                             cpu.writeWord(addr + i * 4, buffer.get(i));
                         }
+                        cpu.registers().writeInteger(MipsRegisters.V0, 0);
                     } else {
                         cpu.registers().writeInteger(MipsRegisters.V0, 1);
                     }
