@@ -3,11 +3,12 @@ package com.github.natanbc.ocmips.handlers;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.MipsException;
 import com.github.natanbc.mipscpu.instruction.InstructionExecutionException;
-import com.github.natanbc.mipscpu.memory.IllegalAddressException;
+import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import com.github.natanbc.ocmips.RetryInNextTick;
 import li.cil.oc.api.machine.LimitReachedException;
 import li.cil.oc.api.machine.Machine;
 
+// struct framebuffer_t { word sync; word width; word height; word vram[width * height]; }
 public class FramebufferHandler implements CleanableHandler {
     private final Machine machine;
     private final String gpuAddress;
@@ -31,32 +32,37 @@ public class FramebufferHandler implements CleanableHandler {
     }
 
     @Override
-    public int read(MipsCPU cpu, int address) throws IllegalAddressException {
+    public int read(MipsCPU cpu, int address) throws MemoryOperationException {
         if(address == base) return 0;
-        int index = (address - base - 4) / 4;
+        if(address == base + 4) return width;
+        if(address == base + 8) return height;
+        int index = (address - base - 12) / 4;
         int x = index % width;
         int y = index / width;
         try {
             Object[] pixel = machine.invoke(gpuAddress, "get", new Object[] { x + 1, y + 1 });
             return (Integer)pixel[2];
         } catch (Exception e) {
-            throw new IllegalAddressException(address, IllegalAddressException.Reason.ACCESS_ERROR);
+            throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
         }
     }
 
     @Override
-    public void write(MipsCPU cpu, int address, int value) throws IllegalAddressException {
+    public void write(MipsCPU cpu, int address, int value) throws MemoryOperationException {
         if(address == base) {
             try {
                 machine.invoke(gpuAddress, "bitblt", new Object[0]);
             } catch(LimitReachedException e) {
                 throw new RetryInNextTick();
             } catch (Exception e) {
-                throw new IllegalAddressException(address, IllegalAddressException.Reason.ACCESS_ERROR);
+                throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
             }
             return;
         }
-        int index = (address - base - 4) / 4;
+        if(address == base + 4 || address == base + 8) {
+            throw new MemoryOperationException(address, MemoryOperationException.Reason.READ_ONLY);
+        }
+        int index = (address - base - 12) / 4;
         int x = index % width;
         int y = index / width;
         try {
@@ -70,7 +76,7 @@ public class FramebufferHandler implements CleanableHandler {
                     " "
             });
         } catch (Exception e) {
-            throw new IllegalAddressException(address, IllegalAddressException.Reason.ACCESS_ERROR);
+            throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
         }
     }
 

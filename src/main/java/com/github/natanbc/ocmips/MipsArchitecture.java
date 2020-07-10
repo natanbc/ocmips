@@ -3,13 +3,14 @@ package com.github.natanbc.ocmips;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.MipsException;
 import com.github.natanbc.mipscpu.MipsRegisters;
-import com.github.natanbc.mipscpu.instruction.InstructionExecutionException;
 import com.github.natanbc.mipscpu.instruction.MipsInstruction;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.mipscpu.memory.MemoryMap;
 import com.github.natanbc.ocmips.handlers.CleanableHandler;
-import com.github.natanbc.ocmips.handlers.FramebufferHandler;
+import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
 import com.github.natanbc.ocmips.utils.BSOD;
+import com.github.natanbc.ocmips.utils.MemoryUtils;
+import com.github.natanbc.ocmips.utils.SpecialComponentMapper;
 import li.cil.oc.api.Driver;
 import li.cil.oc.api.driver.DriverItem;
 import li.cil.oc.api.driver.item.Memory;
@@ -28,6 +29,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @Architecture.Name("MIPS")
 @Architecture.NoMemoryRequirements
@@ -38,7 +41,7 @@ public class MipsArchitecture implements Architecture {
             0x00200008
     };
 
-    private static final int MAX_STEPS_PER_CALL = 15;
+    private static final int MAX_STEPS_PER_CALL = 1500;
 
     private final Machine machine;
     private int ramWords;
@@ -81,6 +84,10 @@ public class MipsArchitecture implements Architecture {
         cpu = new MipsCPU(BOOTROM);
         booted = false;
         crashed = false;
+        MemoryHandler badApple = OCMips.badApple();
+        if(badApple != null) {
+            cpu.addMemoryHandler(0x13370000, badApple);
+        }
         cpu.setSyscallHandler(cpu -> {
             switch (cpu.registers().readInteger(MipsRegisters.V0)) {
                 //sleep
@@ -91,40 +98,54 @@ public class MipsArchitecture implements Architecture {
                 case 2: throw new StopExecution(new ExecutionResult.Shutdown(
                         cpu.registers().readInteger(MipsRegisters.A0) != 0
                 ));
-                //setup framebuffer
+                //map special component
                 case 3: {
-                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
-                    try {
-                        log("Mapping framebuffer to 0x" + Integer.toHexString(addr));
-                        Object[] max = machine.invoke(gpuAddress, "maxResolution", new Object[0]);
-                        int width = (Integer)max[0];
-                        int height = (Integer)max[1];
-                        machine.invoke(gpuAddress, "setResolution", max);
-                        Object[] buffer = machine.invoke(gpuAddress, "allocateBuffer", new Object[0]);
-                        int bufferNumber = (Integer)buffer[0];
-                        machine.invoke(gpuAddress, "setActiveBuffer", new Object[] { bufferNumber });
-                        cpu.addMemoryHandler(addr, new FramebufferHandler(machine, gpuAddress, width, height, bufferNumber));
-                        cpu.registers().writeInteger(MipsRegisters.V0, width);
-                        cpu.registers().writeInteger(MipsRegisters.V1, height);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        throw new InstructionExecutionException("Framebuffer configuration failed");
-                    }
+                    SpecialComponentMapper.map(machine, cpu);
                     return;
                 }
-                //tear down region
+                //unmap region
                 case 4: {
                     int addr = cpu.registers().readInteger(MipsRegisters.A0);
                     MemoryHandler m = cpu.removeMemoryHandler(addr);
                     if(m == null) return;
-                    if(!(m instanceof CleanableHandler)) {
-                        throw new InstructionExecutionException(
-                                "Memory map teardown called on non-cleanable region 0x" + Integer.toHexString(addr));
+                    if(m instanceof CleanableHandler) {
+                        ((CleanableHandler)m).cleanup(cpu);
                     }
-                    ((CleanableHandler)m).cleanup(cpu);
                     return;
                 }
-                default: throw new InstructionExecutionException("Unknown syscall");
+                //map component call
+                case 5: {
+                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
+                    String component = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A1));
+                    String method = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A2));
+                    int maxArg = cpu.registers().readInteger(MipsRegisters.A3);
+                    cpu.addMemoryHandler(addr, new ComponentCallHandler(machine, component, method, maxArg));
+                    return;
+                }
+                //find Nth component by type
+                case 6: {
+                    String type = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A0));
+                    int which = cpu.registers().readInteger(MipsRegisters.A1);
+                    int addr = cpu.registers().readInteger(MipsRegisters.A2);
+                    Optional<String> component = machine.components().entrySet()
+                            .stream()
+                            .filter(e -> e.getValue().equals(type))
+                            .map(Map.Entry::getKey)
+                            .sorted()
+                            .skip(which)
+                            .findFirst();
+                    if(component.isPresent()) {
+                        cpu.registers().writeInteger(MipsRegisters.V0, 0);
+                        IntBuffer buffer = MemoryUtils.toBuffer(UUID.fromString(component.get()));
+                        for(int i = 0; i < buffer.capacity(); i++) {
+                            cpu.writeWord(addr + i * 4, buffer.get(i));
+                        }
+                    } else {
+                        cpu.registers().writeInteger(MipsRegisters.V0, 1);
+                    }
+                    return;
+                }
+                default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
             }
         });
         return true;
@@ -158,7 +179,6 @@ public class MipsArchitecture implements Architecture {
         } catch (StopExecution e) {
             queuedResult = e.getReason();
         } catch (RetryInNextTick ignored) {
-            log("Limit reached, requesting retry");
         }
     }
 
@@ -185,14 +205,13 @@ public class MipsArchitecture implements Architecture {
                 int pc;
                 System.err.printf("PC=   0x%x\n", pc = cpu.registers().readInteger(MipsRegisters.PC));
                 int instr;
-                System.out.printf("Instr=0x%x\n", instr = cpu.readWord(pc));
-                System.out.printf("Instr=%s\n", MipsInstruction.decode(instr));
+                System.err.printf("Instr=0x%x\n", instr = cpu.readWord(pc));
+                System.err.printf("Instr=%s\n", MipsInstruction.decode(instr));
             } catch (Exception ignore) {}
             return new ExecutionResult.Error(e.getMessage());
         } catch (StopExecution e) {
             return e.getReason();
         } catch (RetryInNextTick e) {
-            log("Limit reached, requesting retry");
             return new ExecutionResult.Sleep(1);
         }
     }
