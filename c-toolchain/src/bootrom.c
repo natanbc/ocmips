@@ -65,6 +65,7 @@ int main() {
     address_t gpu;
     int has_gpu = rt_find_component("gpu", 0, &gpu) == 0;
     int has_screen = rt_find_component("screen", 0, &screen) == 0;
+    int can_render = has_gpu & has_screen;
     if(has_gpu && has_screen) {
         invoke1(&gpu, "bind", TYPE_ADDRESS, (int)&screen);
     }
@@ -77,10 +78,10 @@ int main() {
     }
     address_t addr;
     if(rt_find_component("eeprom", 0, &addr) != 0) {
-        rt_bsod(has_gpu ? &gpu : 0, "ERR_NO_EEPROM");
+        rt_bsod(can_render ? &gpu : 0, "ERR_NO_EEPROM");
     }
     if(rt_map_eeprom(eeprom, &addr) != 0) {
-        rt_bsod(has_gpu ? &gpu : 0, "ERR_EEPROM_MAP_FAIL");
+        rt_bsod(can_render ? &gpu : 0, "ERR_EEPROM_MAP_FAIL");
     }
     ((void(*)())rt_get_eeprom_content(eeprom))();
 }
