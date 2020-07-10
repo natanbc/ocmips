@@ -2,7 +2,7 @@ package com.github.natanbc.mipscpu;
 
 import com.github.natanbc.mipscpu.instruction.MipsInstruction;
 import com.github.natanbc.mipscpu.instruction.SyscallHandler;
-import com.github.natanbc.mipscpu.memory.IllegalAddressException;
+import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.mipscpu.memory.MemoryMap;
 
@@ -66,13 +66,13 @@ public class MipsCPU {
         }
     }
 
-    public int readByte(int address) throws IllegalAddressException {
+    public int readByte(int address) throws MemoryOperationException {
         int word = readWord(address & WORD_MASK);
         int shift = 24 - ((address & BYTE_MASK) << 3);
         return (word >> shift) & 0xFF;
     }
 
-    public int readWord(int address) throws IllegalAddressException {
+    public int readWord(int address) throws MemoryOperationException {
         MemoryHandler handler = handlerFor(address);
         if(handler != null) {
             return handler.read(this, address);
@@ -86,7 +86,7 @@ public class MipsCPU {
         throw notMapped(address);
     }
 
-    public void writeByte(int address, int value) throws IllegalAddressException {
+    public void writeByte(int address, int value) throws MemoryOperationException {
         int wordAddress = address & WORD_MASK;
         int word = readWord(wordAddress);
         int shift = 24 - ((address & BYTE_MASK) << 3);
@@ -95,7 +95,7 @@ public class MipsCPU {
         writeWord(wordAddress, word);
     }
 
-    public void writeWord(int address, int value) throws IllegalAddressException {
+    public void writeWord(int address, int value) throws MemoryOperationException {
         MemoryHandler handler = handlerFor(address);
         if(handler != null) {
             handler.write(this, address, value);
@@ -132,11 +132,11 @@ public class MipsCPU {
         return handler;
     }
 
-    private static IllegalAddressException notMapped(int address) {
-        return new IllegalAddressException(address, IllegalAddressException.Reason.NOT_MAPPED);
+    private static MemoryOperationException notMapped(int address) {
+        return new MemoryOperationException(address, MemoryOperationException.Reason.NOT_MAPPED);
     }
 
-    private static IllegalAddressException readOnly(int address) {
-        return new IllegalAddressException(address, IllegalAddressException.Reason.READ_ONLY);
+    private static MemoryOperationException readOnly(int address) {
+        return new MemoryOperationException(address, MemoryOperationException.Reason.READ_ONLY);
     }
 }

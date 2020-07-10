@@ -19,9 +19,9 @@ public interface MemoryHandler {
      *
      * @return The value at the given address.
      *
-     * @throws IllegalAddressException If this operation is not supported on the given address.
+     * @throws MemoryOperationException If this operation is not supported on the given address.
      */
-    int read(MipsCPU cpu, int address) throws IllegalAddressException;
+    int read(MipsCPU cpu, int address) throws MemoryOperationException;
 
     /**
      * Writes to memory on a given address. The address will always be 4-byte aligned.
@@ -30,9 +30,9 @@ public interface MemoryHandler {
      * @param address The address to be written.
      * @param value   The value to write.
      *
-     * @throws IllegalAddressException If this operation is not supported on the given address.
+     * @throws MemoryOperationException If this operation is not supported on the given address.
      */
-    void write(MipsCPU cpu, int address, int value) throws IllegalAddressException;
+    void write(MipsCPU cpu, int address, int value) throws MemoryOperationException;
 
     /**
      * @return The size of the memory region controlled by this handler.
