@@ -32,11 +32,12 @@ class MipsDecoder {
             case 0b011001: return new Multu(rs, rt);
             case 0b100101: return new Or(rd, rs, rt);
             case 0b000000: return new Sll(rd, rt, shamt);
-            case 0b000100: return new Sllv(rd, rs, rt);
+            case 0b000100: return new Sllv(rd, rt, rs);
             case 0b101010: return new Slt(rd, rs, rt);
             case 0b101011: return new Sltu(rd, rs, rt);
-            case 0b000011: return new Sra(rd, rs, shamt);
-            case 0b000010: return new Srl(rd, rs, shamt);
+            case 0b000011: return new Sra(rd, rt, shamt);
+            case 0b000111: return new Srav(rd, rt, rs);
+            case 0b000010: return new Srl(rd, rt, shamt);
             case 0b000110: return new Srlv(rd, rt, rs); /* order is rt, rs */
             case 0b100010: return new Sub(rd, rs, rt);
             case 0b100011: return new Subu(rd, rs, rt);
@@ -69,6 +70,7 @@ class MipsDecoder {
             case 0b000110: return new Blez(rs, signExtend(imm));
             case 0b000101: return new Bne(rs, rt, signExtend(imm));
             case 0b100000: return new Lb(rt, signExtend(imm), rs);
+            case 0b100100: return new Lbu(rt, signExtend(imm), rs);
             case 0b001111: return new Lui(rt, imm);
             case 0b100011: return new Lw(rt, signExtend(imm), rs);
             case 0b001101: return new Ori(rt, rs, imm);

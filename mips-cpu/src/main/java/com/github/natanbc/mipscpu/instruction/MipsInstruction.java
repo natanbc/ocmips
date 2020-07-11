@@ -448,12 +448,34 @@ public interface MipsInstruction {
         @Override
         public void execute(MipsCPU cpu) throws MipsException {
             int address = cpu.registers().readInteger(s) + offset;
-            cpu.registers().writeInteger(t, cpu.readByte(address));
+            //cast to byte to sign-extend
+            cpu.registers().writeInteger(t, (byte)cpu.readByte(address));
         }
 
         @Override
         public String toString() {
             return "lb $" + t + ", " + offset + "($" + s + ")";
+        }
+    }
+
+    class Lbu implements MipsInstruction {
+        private final int t, offset, s;
+
+        public Lbu(int t, int offset, int s) {
+            this.t = t;
+            this.offset = offset;
+            this.s = s;
+        }
+
+        @Override
+        public void execute(MipsCPU cpu) throws MipsException {
+            int address = cpu.registers().readInteger(s) + offset;
+            cpu.registers().writeInteger(t, cpu.readByte(address) & 0xFF);
+        }
+
+        @Override
+        public String toString() {
+            return "lbu $" + t + ", " + offset + "($" + s + ")";
         }
     }
 
@@ -626,7 +648,7 @@ public interface MipsInstruction {
 
         @Override
         public void execute(MipsCPU cpu) throws MipsException {
-            cpu.writeByte(s + offset, 0xFF & cpu.registers().readInteger(t));
+            cpu.writeByte(cpu.registers().readInteger(s) + offset, 0xFF & cpu.registers().readInteger(t));
         }
 
         @Override
@@ -789,6 +811,26 @@ public interface MipsInstruction {
         @Override
         public String toString() {
             return "sra $" + d + ", $" + t + ", " + h;
+        }
+    }
+
+    class Srav implements MipsInstruction {
+        private final int d, t, s;
+
+        public Srav(int d, int t, int s) {
+            this.d = d;
+            this.t = t;
+            this.s = s;
+        }
+
+        @Override
+        public void execute(MipsCPU cpu) {
+            cpu.registers().writeInteger(d, cpu.registers().readInteger(t) >> cpu.registers().readInteger(s));
+        }
+
+        @Override
+        public String toString() {
+            return "srav $" + d + ", $" + t + ", $" + s;
         }
     }
 
