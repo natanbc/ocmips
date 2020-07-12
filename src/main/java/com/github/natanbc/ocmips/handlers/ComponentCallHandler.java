@@ -98,7 +98,7 @@ public class ComponentCallHandler implements MemoryHandler {
                     memory[IDX_RETBUF], memory[IDX_RETBUFSIZE]);
             return;
         }
-        if(address == base + 4) {
+        if(address == base + IDX_ARGC*4) {
             if(value < 0 || value > maxArg) {
                 throw new MemoryOperationException(address, MemoryOperationException.Reason.INVALID_VALUE);
             }
