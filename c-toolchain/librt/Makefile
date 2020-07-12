@@ -4,7 +4,7 @@ CC ?= cc
 CFLAGS ?= -Wall -Wextra -Werror
 ASMFLAGS ?= -Wall -Wextra -Werror
 
-OBJS=rt_init.o rt_helpers.o
+OBJS=rt_init.o rt_helpers.o crt.o
 
 librt.a: $(OBJS)
 	$(AR) rcs $@ $(OBJS)

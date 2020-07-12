@@ -8,7 +8,6 @@
 #define TYPE_ADDRESS             4
 #define TYPE_NULL                5
 #define TYPE_SHORT               6
-#define TYPE_BYTE_ARRAY          7
 
 typedef struct {
     int type;
@@ -34,3 +33,6 @@ typedef struct {
 void rt_call_method(volatile component_method_t* method);
 
 int rt_map_component(volatile component_method_t* addr, address_t* component, const char* method, int max_args);
+
+int rt_pull_signal(void* ret_buf, int ret_buf_size);
+

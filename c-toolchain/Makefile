@@ -17,15 +17,21 @@ else ifeq (${TYPE},bootrom)
 else
     $(error Unknown ROM type ${TYPE})
 endif
-BASE_FLAGS=-target mips-none -march=mips2 -mno-madd4 -mno-msa -mno-mt      \
-		   -mno-virt -mno-xgot -mno-dsp -mno-dspr2 -mabicalls -msoft-float \
-# Guess what? clang generates fucking broken code when using -Os
-#		   -Os
-CFLAGS=${BASE_FLAGS} -fdata-sections -ffunction-sections -Ilibrt
-ASMFLAGS=${BASE_FLAGS} -DRT_SP=${BASE_STACK} -DRT_FP=0 -DRT_GP=0
-LDFLAGS=--image-base=${BASE} --section-start=.text=${BASE} --gc-sections  \
-		--script ${LD_SCRIPT} --defsym=BASE_ADDR=${BASE}
-OBJFLAGS=--set-start=${BASE} -S --strip-unneeded -O binary
+
+override BASE_FLAGS += \
+    -target mips-none -march=mips2 -mno-madd4 -mno-msa -mno-mt      \
+    -mno-virt -mno-xgot -mno-dsp -mno-dspr2 -mabicalls -msoft-float \
+    -mllvm -disable-mips-delay-filler=true -mno-gpopt -mno-crc      \
+    -nostdlib -Os
+override CFLAGS += \
+    ${BASE_FLAGS} -fdata-sections -ffunction-sections -Ilibrt
+override ASMFLAGS += \
+    ${BASE_FLAGS} -DRT_SP=${BASE_STACK} -DRT_FP=0 -DRT_GP=0
+override LDFLAGS += \
+    --image-base=${BASE} --section-start=.text=${BASE} --gc-sections  \
+    --script ${LD_SCRIPT} --defsym=BASE_ADDR=${BASE}
+override OBJFLAGS += \
+    --set-start=${BASE} -S --strip-unneeded -O binary
 
 .PHONY: elf binary clean
 

@@ -67,3 +67,15 @@ rt_bsod: .globl rt_bsod
     syscall
 _bsod_loop:
     j _bsod_loop
+
+# int rt_pull_signal(void* ret_buf, int ret_buf_size)
+rt_pull_signal: .globl rt_pull_signal
+    li $v0, 8
+    syscall
+    jr $ra
+
+# void rt_dbg(const char* msg, int type, int val)
+rt_dbg: .globl rt_dbg
+    li $v0, 9
+    syscall
+    jr $ra
