@@ -3,12 +3,10 @@ package com.github.natanbc.ocmips.handlers;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
+import com.github.natanbc.ocmips.utils.ConversionHelpers;
 import com.github.natanbc.ocmips.utils.MemoryUtils;
 import li.cil.oc.api.machine.Machine;
 import net.minecraft.nbt.NBTTagCompound;
-
-import java.nio.IntBuffer;
-import java.util.UUID;
 
 //struct arg { word type, word value }
 //struct retval { word type, word value, word next }
@@ -21,15 +19,6 @@ import java.util.UUID;
 // struct arg args[argc]
 //}
 public class ComponentCallHandler implements MemoryHandler {
-    public static final int
-            TYPE_INTEGER = 1,
-            TYPE_FLOAT = 2,
-            TYPE_STRING = 3,
-            TYPE_ADDRESS = 4,
-            TYPE_NULL = 5,
-            TYPE_SHORT = 6,
-            TYPE_BYTE_ARRAY = 7;
-    
     private static final int IDX_RETBUF = 0, IDX_RETBUFSIZE = 1,
             IDX_RETCOUNT = 2, IDX_ARGC = 3, IDX_ARGS = 4;
     
@@ -89,12 +78,12 @@ public class ComponentCallHandler implements MemoryHandler {
             int argIdx = 0;
             for(int i = IDX_ARGS; i < memory.length; i += 2) {
                 switch(memory[i]) {
-                    case TYPE_INTEGER: args[argIdx++] = memory[i + 1]; break;
-                    case TYPE_FLOAT: args[argIdx++] = Float.intBitsToFloat(memory[i + 1]); break;
-                    case TYPE_STRING: args[argIdx++] = MemoryUtils.readString(cpu, memory[i+1]); break;
-                    case TYPE_ADDRESS: args[argIdx++] = MemoryUtils.readAddress(cpu, memory[i+1]); break;
-                    case TYPE_NULL: args[argIdx++] = null; break;
-                    case TYPE_SHORT: args[argIdx++] = (short)memory[i + 1]; break;
+                    case ConversionHelpers.TYPE_INTEGER: args[argIdx++] = memory[i + 1]; break;
+                    case ConversionHelpers.TYPE_FLOAT: args[argIdx++] = Float.intBitsToFloat(memory[i + 1]); break;
+                    case ConversionHelpers.TYPE_STRING: args[argIdx++] = MemoryUtils.readString(cpu, memory[i+1]); break;
+                    case ConversionHelpers.TYPE_ADDRESS: args[argIdx++] = MemoryUtils.readAddress(cpu, memory[i+1]); break;
+                    case ConversionHelpers.TYPE_NULL: args[argIdx++] = null; break;
+                    case ConversionHelpers.TYPE_SHORT: args[argIdx++] = (short)memory[i + 1]; break;
                     default: throw new MemoryOperationException(address, MemoryOperationException.Reason.INVALID_VALUE);
                 }
             }
@@ -105,37 +94,8 @@ public class ComponentCallHandler implements MemoryHandler {
                 e.printStackTrace();
                 throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
             }
-            int valuesWritten = 0;
-            int remaining = memory[IDX_RETBUFSIZE];
-            int addr = memory[IDX_RETBUF];
-            int prev = 0;
-            if(ret != null) {
-                for(Object v : ret) {
-                    if(remaining < 12) break;
-                    int type = typeOf(v);
-                    IntBuffer buffer = MemoryUtils.toBuffer(ret);
-                    if(buffer != null && buffer.capacity() > remaining) {
-                        break;
-                    }
-                    if(prev != 0) {
-                        cpu.writeWord(prev + 8, addr);
-                    }
-                    prev = addr;
-                    cpu.writeWord(base, type);
-                    cpu.writeWord(base + 8, 0);
-                    if(type == TYPE_INTEGER || type == TYPE_FLOAT || type == TYPE_NULL) {
-                        cpu.writeWord(base + 4, buffer == null ? 0 : buffer.get(0));
-                    } else {
-                        if(buffer == null) throw new AssertionError();
-                        cpu.writeWord(base + 4, base + 12);
-                        for(int i = 0; i < buffer.capacity(); i++) {
-                            cpu.writeWord(base + 12 + i*4, buffer.get(i));
-                        }
-                    }
-                    valuesWritten++;
-                }
-            }
-            memory[IDX_RETCOUNT] = valuesWritten;
+            memory[IDX_RETCOUNT] = ConversionHelpers.writeObjectsToMemory(cpu, ret,
+                    memory[IDX_RETBUF], memory[IDX_RETBUFSIZE]);
             return;
         }
         if(address == base + 4) {
@@ -153,34 +113,5 @@ public class ComponentCallHandler implements MemoryHandler {
              + 4            // retBufSize
              + 4            // argc
              + 8 * maxArg;  // args
-    }
-    
-    private static int typeOf(Object o) {
-        if(o == null) {
-            return TYPE_NULL;
-        }
-        if(o instanceof Integer) {
-            return TYPE_INTEGER;
-        }
-        if(o instanceof Float) {
-            return TYPE_FLOAT;
-        }
-        if(o instanceof Short) {
-            return TYPE_SHORT;
-        }
-        if(o instanceof String) {
-            try {
-                //noinspection ResultOfMethodCallIgnored
-                UUID.fromString((String)o);
-                return TYPE_ADDRESS;
-            } catch(Exception e) {
-                return TYPE_STRING;
-            }
-        }
-        if(o instanceof byte[]) {
-            return TYPE_BYTE_ARRAY;
-        }
-        System.out.printf("[ocmips] Unsupported return type %s for ComponentCallHandler\n", o.getClass());
-        return TYPE_NULL;
     }
 }

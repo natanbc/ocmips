@@ -3,10 +3,10 @@ package com.github.natanbc.ocmips.handlers;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
+import com.github.natanbc.ocmips.utils.MemoryUtils;
 import li.cil.oc.api.machine.Machine;
 import net.minecraft.nbt.NBTTagCompound;
 
-import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
 
@@ -105,10 +105,12 @@ public class EEPROMHandler implements MemoryHandler {
             //mode = 1 -> sync changes (write back to eeprom, if not dirty we do nothing)
             int mode = value & 1;
             if(mode == 0) {
+                dirty = false;
                 content = null;
                 data = null;
             } else {
                 if(!dirty) return;
+                dirty = false;
                 write(content, "set");
                 write(data, "setData");
             }
@@ -178,7 +180,7 @@ public class EEPROMHandler implements MemoryHandler {
     
         private CachedData(byte[] array) {
             this.array = array;
-            this.buffer = ByteBuffer.wrap(array).asIntBuffer();
+            this.buffer = MemoryUtils.wrapExact(array).asIntBuffer();
         }
     }
 }
