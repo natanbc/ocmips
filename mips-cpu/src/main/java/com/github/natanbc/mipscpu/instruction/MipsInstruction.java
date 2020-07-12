@@ -960,6 +960,27 @@ public interface MipsInstruction {
         }
     }
 
+    class Teq implements MipsInstruction {
+        private final int s, t;
+
+        public Teq(int s, int t) {
+            this.s = s;
+            this.t = t;
+        }
+
+        @Override
+        public void execute(MipsCPU cpu) throws MipsException {
+            if(cpu.registers().readInteger(s) == cpu.registers().readInteger(t)) {
+                throw new TrapException(this, 0);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "teq $" + s + ", $" + t;
+        }
+    }
+
     class Xor implements MipsInstruction {
         private final int d, s, t;
 

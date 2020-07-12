@@ -63,6 +63,11 @@ public class MipsCPU {
 
     public void step() throws MipsException {
         registers.clearFlags();
+        //haha icache go brrrr
+        //jk we don't have those fancy things here
+        //we're a simple cpu
+        //and we like to spam allocations
+        //sorry gc <3
         MipsInstruction i = MipsInstruction.decode(readWord(registers.readInteger(MipsRegisters.PC)));
         i.execute(this);
         if(!registers.wasPcWritten()) {

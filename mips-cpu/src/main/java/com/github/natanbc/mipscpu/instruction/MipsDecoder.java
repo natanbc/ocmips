@@ -42,6 +42,7 @@ class MipsDecoder {
             case 0b100010: return new Sub(rd, rs, rt);
             case 0b100011: return new Subu(rd, rs, rt);
             case 0b001100: return new Syscall();
+            case 0b110100: return new Teq(rs, rt);
             case 0b100110: return new Xor(rd, rs, rt);
             default: return new Invalid(instruction, "Unknown func " + func);
         }
