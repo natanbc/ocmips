@@ -25,9 +25,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 
-import java.io.FileDescriptor;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
 import java.nio.IntBuffer;
 import java.util.Map;
 import java.util.Optional;
@@ -36,7 +33,8 @@ import java.util.UUID;
 @Architecture.Name("MIPS")
 @Architecture.NoMemoryRequirements
 public class MipsArchitecture implements Architecture {
-    private static final int MAX_STEPS_PER_CALL = 1500;
+    //haha cpu clock go brrr
+    private static final int MAX_STEPS_PER_CALL = 5000000;
 
     private final Machine machine;
     private int ramWords;
@@ -95,7 +93,8 @@ public class MipsArchitecture implements Architecture {
             queuedResult = new ExecutionResult.Error(e.getMessage());
         } catch (StopExecution e) {
             queuedResult = e.getReason();
-        } catch (RetryInNextTick ignored) {
+        } catch (RetryInNextTick e) {
+            queuedResult = new ExecutionResult.Sleep(e.isLimitReached() ? 1 : 0);
         }
     }
 
@@ -112,10 +111,11 @@ public class MipsArchitecture implements Architecture {
             for(int i = 0; i < MAX_STEPS_PER_CALL; i++) {
                 cpu.step();
             }
-            return new ExecutionResult.Sleep(10);
+            return new ExecutionResult.Sleep(1);
         } catch (MipsException e) {
-            e.printStackTrace(new PrintStream(new FileOutputStream(FileDescriptor.out)));
+            //e.printStackTrace(new PrintStream(new FileOutputStream(FileDescriptor.out)));
             try {
+                System.out.printf("%s\n", e.getMessage());
                 int pc;
                 System.out.printf("PC=   0x%x\n", pc = cpu.registers().readInteger(MipsRegisters.PC));
                 int instr;
@@ -126,7 +126,7 @@ public class MipsArchitecture implements Architecture {
         } catch (StopExecution e) {
             return e.getReason();
         } catch (RetryInNextTick e) {
-            return new ExecutionResult.Sleep(1);
+            return new ExecutionResult.Sleep(e.isLimitReached() ? 1 : 0);
         }
     }
 
@@ -194,6 +194,7 @@ public class MipsArchitecture implements Architecture {
 
     private MipsCPU createCPU(int[] bootrom) {
         if(bootrom == null) bootrom = OCMips.BOOTROM;
+        OCMips.reloadApple();
         MipsCPU c = new MipsCPU(bootrom);
         c.addMemoryHandler(0x13370000, new BadAppleHandler());
         c.setSyscallHandler(cpu -> {
@@ -287,7 +288,7 @@ public class MipsArchitecture implements Architecture {
                     } else {
                         bsod(addr, msg);
                     }
-                    throw new RetryInNextTick();
+                    throw new RetryInNextTick(null);
                 }
                 //popSignal
                 //$a0 has retval buffer address
@@ -311,6 +312,8 @@ public class MipsArchitecture implements Architecture {
                 //who needs gdb when i can have my shitty pseudo printf
                 //void rt_dbg(const char* msg, int type, int arg);
                 case 9: {
+                    //haha computer go brrrr
+                    //if(true) return;
                     String msg = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A0));
                     int type = cpu.registers().readInteger(MipsRegisters.A1);
                     int val = cpu.registers().readInteger(MipsRegisters.A2);

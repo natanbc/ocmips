@@ -10,13 +10,27 @@ import li.cil.oc.api.machine.Machine;
 
 // struct framebuffer_t { word sync; word width; word height; word vram[width * height]; }
 public class FramebufferHandler implements CleanableHandler {
+    public static final int SYNC_BITBLT = 1, SYNC_CLEAR = 2;
+
+    //don't allocate as much data (since the video player spams the framebuffer quite a bit)
+    private static final ThreadLocal<Object[]> SINGLE_ELEMENT = ThreadLocal.withInitial(() -> new Object[1]);
+    private static final ThreadLocal<Object[]> THREE_ELEMENTS = ThreadLocal.withInitial(() -> new Object[3]);
+    private static final Object[] EMPTY = new Object[0];
+    private static final Object[] CLEAR_ARGS = {
+            1,
+            1,
+            160,
+            50,
+            " "
+    };
+
     private final Machine machine;
     private final String gpuAddress;
     private final int width;
     private final int height;
     private final int bufferNumber;
     private int base;
-    private int background;
+    private Integer background = 0;
 
     public FramebufferHandler(Machine machine, String gpuAddress, int w, int h, int bufferNumber) {
         this.machine = machine;
@@ -66,12 +80,28 @@ public class FramebufferHandler implements CleanableHandler {
     @Override
     public void write(MipsCPU cpu, int address, int value) throws MemoryOperationException {
         if(address == base) {
-            try {
-                machine.invoke(gpuAddress, "bitblt", new Object[0]);
-            } catch(LimitReachedException e) {
-                throw new RetryInNextTick();
-            } catch (Exception e) {
-                throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
+            if(value == SYNC_BITBLT) {
+                try {
+                    machine.invoke(gpuAddress, "bitblt", EMPTY);
+                } catch(LimitReachedException e) {
+                    throw new RetryInNextTick(e);
+                } catch (Exception e) {
+                    throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
+                }
+            } else if(value == SYNC_CLEAR) {
+                try {
+                    Object[] o = SINGLE_ELEMENT.get();
+                    o[0] = 0;
+                    machine.invoke(gpuAddress, "setBackground", o);
+                    background = 0;
+                    machine.invoke(gpuAddress, "fill", CLEAR_ARGS);
+                } catch (LimitReachedException e) {
+                    throw new RetryInNextTick(e);
+                } catch (Exception e) {
+                    throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
+                }
+            } else {
+                throw new MemoryOperationException(address, MemoryOperationException.Reason.INVALID_VALUE);
             }
             return;
         }
@@ -83,14 +113,16 @@ public class FramebufferHandler implements CleanableHandler {
         int y = index / width;
         try {
             if(background != value) {
-                machine.invoke(gpuAddress, "setBackground", new Object[] { value });
+                Object[] o = SINGLE_ELEMENT.get();
+                o[0] = value;
+                machine.invoke(gpuAddress, "setBackground", o);
                 background = value;
             }
-            machine.invoke(gpuAddress, "set", new Object[] {
-                    x + 1,
-                    y + 1,
-                    " "
-            });
+            Object[] o = THREE_ELEMENTS.get();
+            o[0] = x+1;
+            o[1] = y+1;
+            o[2] = " ";
+            machine.invoke(gpuAddress, "set", o);
         } catch (Exception e) {
             throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
         }
@@ -98,7 +130,7 @@ public class FramebufferHandler implements CleanableHandler {
 
     @Override
     public int memorySize() {
-        return (width * height + 1) * 4;
+        return (width * height + 3) * 4;
     }
 
     @Override

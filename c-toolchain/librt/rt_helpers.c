@@ -24,6 +24,10 @@ void rt_sync_framebuffer(volatile framebuffer_t* fb) {
     fb->sync = 1;
 }
 
+void rt_clear_framebuffer(volatile framebuffer_t* fb) {
+    fb->sync = 2;
+}
+
 void rt_sync_drive(volatile drive_t* drive, int mode) {
     drive->sync = mode;
 }

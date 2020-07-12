@@ -26,10 +26,14 @@ public class OCMips {
             if(is == null) throw new AssertionError("badapple.bin not found");
             byte[] badApple = IOUtils.toByteArray(is);
             ByteBuffer bb = MemoryUtils.allocateRounding(badApple.length);
-            bb.put(badApple);
+            bb.put(badApple).position(0);
             badAppleBuffer = bb.asIntBuffer();
         }
-        try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
+        reloadApple();
+    }
+
+    public static void reloadApple() {
+        try(InputStream is = OCMips.class.getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
             if(is == null) throw new AssertionError("bootrom.bin not found");
             byte[] rom = IOUtils.toByteArray(is);
             IntBuffer data = ((ByteBuffer)
@@ -39,6 +43,8 @@ public class OCMips {
                     .asIntBuffer();
             BOOTROM = new int[data.remaining()];
             data.get(BOOTROM);
+        } catch (Exception e) {
+            throw new AssertionError(e);
         }
     }
 }
