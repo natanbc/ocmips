@@ -4,6 +4,7 @@ import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.ocmips.handlers.BadAppleHandler;
 import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
+import com.github.natanbc.ocmips.handlers.DriveHandler;
 import com.github.natanbc.ocmips.handlers.EEPROMHandler;
 import com.github.natanbc.ocmips.handlers.FramebufferHandler;
 import li.cil.oc.api.machine.Machine;
@@ -61,6 +62,16 @@ public class HandlerSerialization {
             tag.setInteger("bufferNumber", fb.getBufferNumber());
             return;
         }
+        if(handler instanceof DriveHandler) {
+            DriveHandler h = (DriveHandler)handler;
+            tag.setString("type", "drive");
+            tag.setString("address", h.getDriveAddress());
+            tag.setInteger("mode", h.getMode());
+            tag.setInteger("size", h.getSize());
+            tag.setInteger("sectorSize", h.getSectorSize());
+            h.save(tag);
+            return;
+        }
         if(handler instanceof BadAppleHandler) {
             tag.setString("type", "bad_apple");
             return;
@@ -92,6 +103,14 @@ public class HandlerSerialization {
                         tag.getInteger("width"), tag.getInteger("height"),
                         tag.getInteger("bufferNumber")
                 );
+            }
+            case "drive": {
+                DriveHandler h = new DriveHandler(
+                        machine, tag.getString("address"), tag.getInteger("mode"),
+                        tag.getInteger("size"), tag.getInteger("sectorSize")
+                );
+                h.restore(tag);
+                return h;
             }
             case "bad_apple": {
                 return new BadAppleHandler();

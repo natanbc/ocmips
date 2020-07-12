@@ -9,6 +9,7 @@ import com.github.natanbc.ocmips.handlers.BadAppleHandler;
 import com.github.natanbc.ocmips.handlers.CleanableHandler;
 import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
 import com.github.natanbc.ocmips.utils.BSOD;
+import com.github.natanbc.ocmips.utils.ConversionHelpers;
 import com.github.natanbc.ocmips.utils.HandlerSerialization;
 import com.github.natanbc.ocmips.utils.MemoryUtils;
 import com.github.natanbc.ocmips.utils.SpecialComponentMapper;
@@ -18,6 +19,7 @@ import li.cil.oc.api.driver.item.Memory;
 import li.cil.oc.api.machine.Machine;
 import li.cil.oc.api.machine.Architecture;
 import li.cil.oc.api.machine.ExecutionResult;
+import li.cil.oc.api.machine.Signal;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import org.apache.logging.log4j.Level;
@@ -197,22 +199,34 @@ public class MipsArchitecture implements Architecture {
         c.setSyscallHandler(cpu -> {
             switch (cpu.registers().readInteger(MipsRegisters.V0)) {
                 //sleep
+                //$a0 has the time to sleep
+                //returns nothing
                 case 1: throw new StopExecution(new ExecutionResult.Sleep(
                         cpu.registers().readInteger(MipsRegisters.A0)
                 ));
-                    //shutdown
+                //shutdown
+                //$a0 is whether or not to reboot. anything other than 0 is a reboot
+                //never returns
                 case 2: throw new StopExecution(new ExecutionResult.Shutdown(
                         cpu.registers().readInteger(MipsRegisters.A0) != 0
                 ));
-                    //map special component
+                //map special component
+                //$a0 has the memory address to map into
+                //$a1 has the component address
+                //$a2 has the type of map to create
+                //$a3 has extra flags for the map
+                //returns 0 on success
                 case 3: {
                     SpecialComponentMapper.map(machine, cpu);
                     return;
                 }
                 //unmap region
+                //$a0 has the address of the memory map to remove
+                //returns 0 on success, -1 on failure
                 case 4: {
                     int addr = cpu.registers().readInteger(MipsRegisters.A0);
                     MemoryHandler m = cpu.removeMemoryHandler(addr);
+                    cpu.registers().writeInteger(MipsRegisters.V0, m == null ? -1 : 0);
                     if(m == null) return;
                     if(m instanceof CleanableHandler) {
                         ((CleanableHandler)m).cleanup(cpu);
@@ -220,15 +234,25 @@ public class MipsArchitecture implements Architecture {
                     return;
                 }
                 //map component call
+                //$a0 has the address of the component_method_t struct
+                //$a1 has the address of the component uuid
+                //$a2 has the name of the method (eg "beep")
+                //$a3 has the maximum number of arguments that might be passed
+                //always succeeds
                 case 5: {
                     int addr = cpu.registers().readInteger(MipsRegisters.A0);
                     String component = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A1));
                     String method = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A2));
                     int maxArg = cpu.registers().readInteger(MipsRegisters.A3);
                     cpu.addMemoryHandler(addr, new ComponentCallHandler(machine, component, method, maxArg));
+                    cpu.registers().writeInteger(MipsRegisters.V0, 0);
                     return;
                 }
                 //find Nth component by type
+                //$a0 has a string with the component type (eg "gpu")
+                //$a1 has which component to get (sorted by address, 0 is the first)
+                //$a2 has the memory address to write the component uuid, if found
+                //returns 0 if found, 1 if not found
                 case 6: {
                     String type = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A0));
                     int which = cpu.registers().readInteger(MipsRegisters.A1);
@@ -241,7 +265,7 @@ public class MipsArchitecture implements Architecture {
                             .skip(which)
                             .findFirst();
                     if(component.isPresent()) {
-                        IntBuffer buffer = MemoryUtils.toBuffer(UUID.fromString(component.get()));
+                        IntBuffer buffer = ConversionHelpers.toBuffer(UUID.fromString(component.get()));
                         for(int i = 0; i < buffer.capacity(); i++) {
                             cpu.writeWord(addr + i * 4, buffer.get(i));
                         }
@@ -251,6 +275,10 @@ public class MipsArchitecture implements Architecture {
                     }
                     return;
                 }
+                //bsod
+                //$a0 has the gpu address to draw the bsod on. may be null
+                //$a1 has the bsod message
+                //never returns
                 case 7: {
                     String addr = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A0));
                     String msg = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A1));
@@ -260,6 +288,39 @@ public class MipsArchitecture implements Architecture {
                         bsod(addr, msg);
                     }
                     throw new RetryInNextTick();
+                }
+                //popSignal
+                //$a0 has retval buffer address
+                //$a1 has retval buffer size
+                //returns the number of arguments of the signal or -1 if no signal was queued
+                case 8: {
+                    Signal s = machine.popSignal();
+                    if(s == null) {
+                        cpu.registers().writeInteger(MipsRegisters.V0, -1);
+                    } else {
+                        Object[] array = new Object[s.args().length + 1];
+                        System.arraycopy(s.args(), 0, array, 1, s.args().length);
+                        array[0] = s.name();
+                        cpu.registers().writeInteger(MipsRegisters.V0, ConversionHelpers.writeObjectsToMemory(
+                                cpu, array, cpu.registers().readInteger(MipsRegisters.A0),
+                                cpu.registers().readInteger(MipsRegisters.A1)
+                        ));
+                    }
+                    return;
+                }
+                //who needs gdb when i can have my shitty pseudo printf
+                //void rt_dbg(const char* msg, int type, int arg);
+                case 9: {
+                    String msg = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A0));
+                    int type = cpu.registers().readInteger(MipsRegisters.A1);
+                    int val = cpu.registers().readInteger(MipsRegisters.A2);
+                    if(type == ConversionHelpers.TYPE_STRING) {
+                        System.out.printf("[dbg] %s: %s\n", msg, MemoryUtils.readString(cpu, val));
+                    } else if(type == ConversionHelpers.TYPE_ADDRESS) {
+                        System.out.printf("[dbg] %s: %s\n", msg, MemoryUtils.readAddress(cpu, val));
+                    } else {
+                        System.out.printf("[dbg] %s: %d (0x%x)\n", msg, val, val);
+                    }
                 }
                 default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
             }
