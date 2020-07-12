@@ -7,11 +7,40 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.UUID;
 
 public class MemoryUtils {
+    public static ByteBuffer allocateUnchecked(int size) {
+        return ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
+    }
+
+    public static ByteBuffer allocateExact(int size) {
+        if(!isExactWordCount(size)) {
+            throw new IllegalArgumentException("Size is not a multiple of 4: " + size);
+        }
+        return allocateUnchecked(size);
+    }
+
+    public static IntBuffer allocateWords(int words) {
+        return allocateUnchecked(words * 4).asIntBuffer();
+    }
+
+    public static ByteBuffer allocateRounding(int size) {
+        //round size up to the next multiple of 4 (or size if it's already one)
+        return allocateUnchecked((size + 3) & (-4));
+    }
+
+    public static ByteBuffer wrapExact(byte[] array) {
+        if(!isExactWordCount(array.length)) {
+            throw new IllegalArgumentException("Length is not a multiple of 4: " + array.length);
+        }
+        return ByteBuffer.wrap(array);
+    }
+
+    public static boolean isExactWordCount(int bytes) {
+        return (bytes & 0b11) == 0;
+    }
+
     public static String readString(MipsCPU cpu, int address) throws MemoryOperationException {
         if(address == 0) return null;
         StringBuilder sb = new StringBuilder();
@@ -36,48 +65,5 @@ public class MemoryUtils {
         }
         LongBuffer lb = buffer.asLongBuffer();
         return new UUID(lb.get(0), lb.get(1)).toString();
-    }
-    
-    public static IntBuffer toBuffer(Object value) {
-        if(value == null) {
-            return null;
-        }
-        if(value instanceof Integer) {
-            return IntBuffer.allocate(1).put((Integer)value);
-        }
-        if(value instanceof Float) {
-            return IntBuffer.allocate(1).put(Float.floatToRawIntBits((Float)value));
-        }
-        if(value instanceof Short) {
-            return IntBuffer.allocate(1).put((Short)value);
-        }
-        if(value instanceof UUID) {
-            UUID id = (UUID)value;
-            ByteBuffer bb = ByteBuffer.allocate(16);
-            bb.asLongBuffer()
-                    .put(id.getMostSignificantBits())
-                    .put(id.getLeastSignificantBits());
-            return bb.asIntBuffer();
-        }
-        if(value instanceof String) {
-            try {
-                return toBuffer(UUID.fromString((String)value));
-            } catch(Exception e) {
-                byte[] utf8 = ((String)value).getBytes(StandardCharsets.UTF_8);
-                return ByteBuffer.allocate(utf8.length + 1)
-                               .put(utf8)
-                               .put((byte)0)
-                               .asIntBuffer();
-            }
-        }
-        if(value instanceof byte[]) {
-            byte[] b = (byte[])value;
-            //if length not a multiple of 4, round it up to a multiple of 4.
-            if(b.length % 4 != 0) {
-                b = Arrays.copyOf(b, (b.length & ~0b11) + 4);
-            }
-            return ByteBuffer.wrap(b).asIntBuffer();
-        }
-        return null;
     }
 }

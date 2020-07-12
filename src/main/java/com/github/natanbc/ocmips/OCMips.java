@@ -1,5 +1,6 @@
 package com.github.natanbc.ocmips;
 
+import com.github.natanbc.ocmips.utils.MemoryUtils;
 import li.cil.oc.api.Machine;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
@@ -8,7 +9,6 @@ import org.apache.commons.compress.utils.IOUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
 @Mod(modid = "ocmips", name = "OCMIPS",
@@ -25,12 +25,17 @@ public class OCMips {
         try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/badapple.bin")) {
             if(is == null) throw new AssertionError("badapple.bin not found");
             byte[] badApple = IOUtils.toByteArray(is);
-            badAppleBuffer = ByteBuffer.wrap(badApple).asIntBuffer();
+            ByteBuffer bb = MemoryUtils.allocateRounding(badApple.length);
+            bb.put(badApple);
+            badAppleBuffer = bb.asIntBuffer();
         }
         try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
             if(is == null) throw new AssertionError("bootrom.bin not found");
-            IntBuffer data = ByteBuffer.wrap(IOUtils.toByteArray(is))
-                    .order(ByteOrder.BIG_ENDIAN)
+            byte[] rom = IOUtils.toByteArray(is);
+            IntBuffer data = ((ByteBuffer)
+                    MemoryUtils.allocateRounding(rom.length)
+                            .put(rom)
+                            .position(0))
                     .asIntBuffer();
             BOOTROM = new int[data.remaining()];
             data.get(BOOTROM);
