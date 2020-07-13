@@ -4,6 +4,7 @@ SECTIONS {
     .text ORIGIN(rom): {
         *(.text.entrypoint)
         *(.text)
+        *(.text.*)
     } >rom
     .rodata ADDR(.text) + SIZEOF(.text): {
         *(.rodata)
