@@ -2,6 +2,7 @@ ENTRY(__start)
 
 SECTIONS {
     .text ORIGIN(rom): {
+        *(.text.entrypoint)
         *(.text)
     } >rom
     .rodata ADDR(.text) + SIZEOF(.text): {
@@ -21,5 +22,6 @@ SECTIONS {
         *(.MIPS.abiflags)
         *(.reginfo)
         *(.got)
+        *(.eh_frame)
     } :NONE
 }
