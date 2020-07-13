@@ -33,7 +33,7 @@ public class OCMips {
             BOOTROM = new int[data.remaining()];
             data.get(BOOTROM);
         }
-        try(InputStream is = OCMips.class.getResourceAsStream("assets/ocmips/badapple.bin")) {
+        try(InputStream is = OCMips.class.getClassLoader().getResourceAsStream("assets/ocmips/badapple.bin")) {
             if(is == null) throw new AssertionError("badapple.bin not found");
             byte[] badApple = IOUtils.toByteArray(is);
             ByteBuffer bb = MemoryUtils.allocateRounding(badApple.length);
