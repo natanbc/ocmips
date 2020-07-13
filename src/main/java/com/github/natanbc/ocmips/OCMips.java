@@ -22,18 +22,7 @@ public class OCMips {
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent ev) throws IOException {
         Machine.add(MipsArchitecture.class);
-        try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/badapple.bin")) {
-            if(is == null) throw new AssertionError("badapple.bin not found");
-            byte[] badApple = IOUtils.toByteArray(is);
-            ByteBuffer bb = MemoryUtils.allocateRounding(badApple.length);
-            bb.put(badApple).position(0);
-            badAppleBuffer = bb.asIntBuffer();
-        }
-        reloadApple();
-    }
-
-    public static void reloadApple() {
-        try(InputStream is = OCMips.class.getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
+        try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
             if(is == null) throw new AssertionError("bootrom.bin not found");
             byte[] rom = IOUtils.toByteArray(is);
             IntBuffer data = ((ByteBuffer)
@@ -43,8 +32,13 @@ public class OCMips {
                     .asIntBuffer();
             BOOTROM = new int[data.remaining()];
             data.get(BOOTROM);
-        } catch (Exception e) {
-            throw new AssertionError(e);
+        }
+        try(InputStream is = OCMips.class.getResourceAsStream("assets/ocmips/bad_apple.bin")) {
+            if(is == null) throw new AssertionError("bad_apple.bin not found");
+            byte[] badApple = IOUtils.toByteArray(is);
+            ByteBuffer bb = MemoryUtils.allocateRounding(badApple.length);
+            bb.put(badApple).position(0);
+            badAppleBuffer = bb.asIntBuffer();
         }
     }
 }

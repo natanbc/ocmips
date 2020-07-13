@@ -20,6 +20,8 @@ import li.cil.oc.api.machine.Machine;
 import li.cil.oc.api.machine.Architecture;
 import li.cil.oc.api.machine.ExecutionResult;
 import li.cil.oc.api.machine.Signal;
+import li.cil.oc.api.network.Component;
+import li.cil.oc.api.network.Node;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import org.apache.logging.log4j.Level;
@@ -109,6 +111,11 @@ public class MipsArchitecture implements Architecture {
         if(r != null) return r;
         try {
             for(int i = 0; i < MAX_STEPS_PER_CALL; i++) {
+//                int pc;
+//                System.out.printf("PC=   0x%x\n", pc = cpu.registers().readInteger(MipsRegisters.PC));
+//                int instr;
+//                System.out.printf("Instr=0x%x\n", instr = cpu.readWord(pc));
+//                System.out.printf("Instr=%s\n", MipsInstruction.toString(instr));
                 cpu.step();
             }
             return new ExecutionResult.Sleep(1);
@@ -120,7 +127,7 @@ public class MipsArchitecture implements Architecture {
                 System.out.printf("PC=   0x%x\n", pc = cpu.registers().readInteger(MipsRegisters.PC));
                 int instr;
                 System.out.printf("Instr=0x%x\n", instr = cpu.readWord(pc));
-                System.out.printf("Instr=%s\n", MipsInstruction.decode(instr));
+                System.out.printf("Instr=%s\n", MipsInstruction.toString(instr));
             } catch (Exception ignore) {}
             return new ExecutionResult.Error(e.getMessage());
         } catch (StopExecution e) {
@@ -194,7 +201,6 @@ public class MipsArchitecture implements Architecture {
 
     private MipsCPU createCPU(int[] bootrom) {
         if(bootrom == null) bootrom = OCMips.BOOTROM;
-        OCMips.reloadApple();
         MipsCPU c = new MipsCPU(bootrom);
         c.addMemoryHandler(0x13370000, new BadAppleHandler());
         c.setSyscallHandler(cpu -> {
@@ -239,12 +245,32 @@ public class MipsArchitecture implements Architecture {
                 //$a1 has the address of the component uuid
                 //$a2 has the name of the method (eg "beep")
                 //$a3 has the maximum number of arguments that might be passed
-                //always succeeds
+                //returns 0 on success, -1 if the component doesn't exist, -2 if the method doesn't exist
                 case 5: {
                     int addr = cpu.registers().readInteger(MipsRegisters.A0);
                     String component = MemoryUtils.readAddress(cpu, cpu.registers().readInteger(MipsRegisters.A1));
                     String method = MemoryUtils.readString(cpu, cpu.registers().readInteger(MipsRegisters.A2));
                     int maxArg = cpu.registers().readInteger(MipsRegisters.A3);
+
+                    if(!machine.components().containsKey(component)) {
+                        cpu.registers().writeInteger(MipsRegisters.V0, -1);
+                        return;
+                    }
+                    Node n = machine.node().network().node(component);
+                    if(!(n instanceof Component)) {
+                        cpu.registers().writeInteger(MipsRegisters.V0, -1);
+                        return;
+                    }
+                    Component comp = (Component)n;
+                    if(!comp.canBeSeenFrom(machine.node()) && comp != machine.node()) {
+                        cpu.registers().writeInteger(MipsRegisters.V0, -1);
+                        return;
+                    }
+                    if(!machine.methods(comp.host()).containsKey(method)) {
+                        cpu.registers().writeInteger(MipsRegisters.V0, -2);
+                        return;
+                    }
+
                     cpu.addMemoryHandler(addr, new ComponentCallHandler(machine, component, method, maxArg));
                     cpu.registers().writeInteger(MipsRegisters.V0, 0);
                     return;
