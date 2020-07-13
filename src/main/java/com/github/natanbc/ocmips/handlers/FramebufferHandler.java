@@ -5,6 +5,7 @@ import com.github.natanbc.mipscpu.MipsException;
 import com.github.natanbc.mipscpu.instruction.InstructionExecutionException;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import com.github.natanbc.ocmips.RetryInNextTick;
+import com.github.natanbc.ocmips.handlers.internal.FramebufferRenderer;
 import li.cil.oc.api.machine.LimitReachedException;
 import li.cil.oc.api.machine.Machine;
 
@@ -12,17 +13,13 @@ import li.cil.oc.api.machine.Machine;
 public class FramebufferHandler implements CleanableHandler {
     public static final int SYNC_BITBLT = 1, SYNC_CLEAR = 2;
 
-    //don't allocate as much data (since the video player spams the framebuffer quite a bit)
-    private static final ThreadLocal<Object[]> SINGLE_ELEMENT = ThreadLocal.withInitial(() -> new Object[1]);
-    private static final ThreadLocal<Object[]> THREE_ELEMENTS = ThreadLocal.withInitial(() -> new Object[3]);
-
     private final Machine machine;
     private final String gpuAddress;
     private final int width;
     private final int height;
     private final int bufferNumber;
+    private final FramebufferRenderer renderer;
     private int base;
-    private Integer background = 0;
 
     public FramebufferHandler(Machine machine, String gpuAddress, int w, int h, int bufferNumber) {
         this.machine = machine;
@@ -30,6 +27,7 @@ public class FramebufferHandler implements CleanableHandler {
         this.width = w;
         this.height = h;
         this.bufferNumber = bufferNumber;
+        this.renderer = FramebufferRenderer.create(machine, gpuAddress, bufferNumber, w, h);
     }
 
     public String getGpuAddress() {
@@ -82,17 +80,7 @@ public class FramebufferHandler implements CleanableHandler {
                 }
             } else if(value == SYNC_CLEAR) {
                 try {
-                    Object[] o = SINGLE_ELEMENT.get();
-                    o[0] = 0;
-                    machine.invoke(gpuAddress, "setBackground", o);
-                    background = 0;
-                    machine.invoke(gpuAddress, "fill", new Object[] {
-                            1,
-                            1,
-                            width,
-                            height,
-                            " "
-                    });
+                    renderer.clear();
                 } catch (LimitReachedException e) {
                     throw new RetryInNextTick(e);
                 } catch (Exception e) {
@@ -110,17 +98,7 @@ public class FramebufferHandler implements CleanableHandler {
         int x = index % width;
         int y = index / width;
         try {
-            if(background != value) {
-                Object[] o = SINGLE_ELEMENT.get();
-                o[0] = value;
-                machine.invoke(gpuAddress, "setBackground", o);
-                background = value;
-            }
-            Object[] o = THREE_ELEMENTS.get();
-            o[0] = x+1;
-            o[1] = y+1;
-            o[2] = " ";
-            machine.invoke(gpuAddress, "set", o);
+            renderer.set(x, y, value);
         } catch (Exception e) {
             throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
         }
