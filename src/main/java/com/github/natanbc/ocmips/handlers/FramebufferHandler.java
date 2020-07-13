@@ -15,14 +15,6 @@ public class FramebufferHandler implements CleanableHandler {
     //don't allocate as much data (since the video player spams the framebuffer quite a bit)
     private static final ThreadLocal<Object[]> SINGLE_ELEMENT = ThreadLocal.withInitial(() -> new Object[1]);
     private static final ThreadLocal<Object[]> THREE_ELEMENTS = ThreadLocal.withInitial(() -> new Object[3]);
-    private static final Object[] EMPTY = new Object[0];
-    private static final Object[] CLEAR_ARGS = {
-            1,
-            1,
-            160,
-            50,
-            " "
-    };
 
     private final Machine machine;
     private final String gpuAddress;
@@ -82,7 +74,7 @@ public class FramebufferHandler implements CleanableHandler {
         if(address == base) {
             if(value == SYNC_BITBLT) {
                 try {
-                    machine.invoke(gpuAddress, "bitblt", EMPTY);
+                    machine.invoke(gpuAddress, "bitblt", new Object[0]);
                 } catch(LimitReachedException e) {
                     throw new RetryInNextTick(e);
                 } catch (Exception e) {
@@ -94,7 +86,13 @@ public class FramebufferHandler implements CleanableHandler {
                     o[0] = 0;
                     machine.invoke(gpuAddress, "setBackground", o);
                     background = 0;
-                    machine.invoke(gpuAddress, "fill", CLEAR_ARGS);
+                    machine.invoke(gpuAddress, "fill", new Object[] {
+                            1,
+                            1,
+                            width,
+                            height,
+                            " "
+                    });
                 } catch (LimitReachedException e) {
                     throw new RetryInNextTick(e);
                 } catch (Exception e) {
