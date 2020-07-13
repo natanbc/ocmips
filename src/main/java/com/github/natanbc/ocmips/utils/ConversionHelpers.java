@@ -15,7 +15,8 @@ public class ConversionHelpers {
             TYPE_STRING = 3,
             TYPE_ADDRESS = 4,
             TYPE_NULL = 5,
-            TYPE_SHORT = 6;
+            TYPE_SHORT = 6,
+            TYPE_BOOLEAN = 7;
 
     // struct retval { word type, word value, word next }
     public static int writeObjectsToMemory(MipsCPU cpu, Object[] arr, int addr, int size) throws MemoryOperationException {
@@ -58,6 +59,9 @@ public class ConversionHelpers {
         if(value == null) {
             return null;
         }
+        if(value instanceof Boolean) {
+            return MemoryUtils.allocateWords(1).put(((Boolean)value) ? 1 : 0);
+        }
         if(value instanceof Integer || value instanceof Long) {
             return MemoryUtils.allocateWords(1).put(((Number)value).intValue());
         }
@@ -94,6 +98,9 @@ public class ConversionHelpers {
     public static int typeOf(Object o) {
         if(o == null) {
             return TYPE_NULL;
+        }
+        if(o instanceof Boolean) {
+            return TYPE_BOOLEAN;
         }
         if(o instanceof Integer || o instanceof Long) {
             return TYPE_INTEGER;

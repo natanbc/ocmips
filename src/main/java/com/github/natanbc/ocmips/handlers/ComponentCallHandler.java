@@ -84,6 +84,7 @@ public class ComponentCallHandler implements MemoryHandler {
                     case ConversionHelpers.TYPE_ADDRESS: args[argIdx++] = MemoryUtils.readAddress(cpu, memory[i+1]); break;
                     case ConversionHelpers.TYPE_NULL: args[argIdx++] = null; break;
                     case ConversionHelpers.TYPE_SHORT: args[argIdx++] = (short)memory[i + 1]; break;
+                    case ConversionHelpers.TYPE_BOOLEAN: args[argIdx++] = memory[i + 1] != 0; break;
                     default: throw new MemoryOperationException(address, MemoryOperationException.Reason.INVALID_VALUE);
                 }
             }

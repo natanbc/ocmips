@@ -8,6 +8,7 @@
 #define TYPE_ADDRESS             4
 #define TYPE_NULL                5
 #define TYPE_SHORT               6
+#define TYPE_BOOLEAN             7
 
 typedef struct {
     int type;
