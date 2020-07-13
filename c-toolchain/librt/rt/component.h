@@ -8,4 +8,5 @@
 
 int rt_find_component(const char* type, int which, address_t* dest);
 
-int rt_map_special_component(volatile void* addr, address_t* component, int type);
+int rt_map_special_component(volatile void* addr, address_t* component, int type, int flags);
+

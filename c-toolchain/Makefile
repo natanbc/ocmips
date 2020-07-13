@@ -22,7 +22,7 @@ override BASE_FLAGS += \
     -target mips-none -march=mips2 -mno-madd4 -mno-msa -mno-mt      \
     -mno-virt -mno-xgot -mno-dsp -mno-dspr2 -mabicalls -msoft-float \
     -mllvm -disable-mips-delay-filler=true -mno-gpopt -mno-crc      \
-    -nostdlib -Os
+    -nostdlib
 override CFLAGS += \
     ${BASE_FLAGS} -fdata-sections -ffunction-sections -Ilibrt
 override ASMFLAGS += \
