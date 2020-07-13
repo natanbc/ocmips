@@ -8,6 +8,7 @@ import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.ocmips.handlers.BadAppleHandler;
 import com.github.natanbc.ocmips.handlers.CleanableHandler;
 import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
+import com.github.natanbc.ocmips.handlers.RemapHandler;
 import com.github.natanbc.ocmips.utils.BSOD;
 import com.github.natanbc.ocmips.utils.ConversionHelpers;
 import com.github.natanbc.ocmips.utils.HandlerSerialization;
@@ -36,7 +37,7 @@ import java.util.UUID;
 @Architecture.NoMemoryRequirements
 public class MipsArchitecture implements Architecture {
     //haha cpu clock go brrr
-    private static final int MAX_STEPS_PER_CALL = 5000000;
+    private static final int MAX_STEPS_PER_CALL = 500000;
 
     private final Machine machine;
     private int ramWords;
@@ -171,7 +172,11 @@ public class MipsArchitecture implements Architecture {
             int[] regs = new int[MipsRegisters.INTEGER_COUNT];
             for(int i = 0; i < regs.length; i++) regs[i] = cpu.registers().readInteger(i);
             tag.setIntArray("mips_registers", regs);
-            HandlerSerialization.serializeHandlers(cpu, tag);
+            try {
+                HandlerSerialization.serializeHandlers(cpu, tag);
+            } catch (Throwable t) {
+                tag.setBoolean("mips_powered_on", false);
+            }
         } else {
             tag.setBoolean("mips_powered_on", false);
         }
@@ -350,6 +355,33 @@ public class MipsArchitecture implements Architecture {
                     } else {
                         System.out.printf("[dbg] %s: %d (0x%x)\n", msg, val, val);
                     }
+                    return;
+                }
+                //mremap
+                //$a0 has the map location
+                //$a1 has the target address
+                //$a2 has the map size
+                //return 0 on success, -1 on failure (eg mremap to an mremap location)
+                case 10: {
+                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
+                    int target = cpu.registers().readInteger(MipsRegisters.A1);
+                    int size = cpu.registers().readInteger(MipsRegisters.A2);
+                    Integer previousAddr = cpu.memoryHandlers().floorKey(addr);
+                    if(previousAddr != null) {
+                        //given two ranges, [x1, x2] and [y1, y2],
+                        //with x1 <= x2 and y1 <= y2, they overlap iff
+                        //x1 <= y2 && y1 <= x2
+                        MemoryHandler prev = cpu.memoryHandlers().get(previousAddr);
+                        if(previousAddr <= addr + size && addr <= previousAddr + prev.memorySize()) {
+                            if(prev instanceof RemapHandler) {
+                                cpu.registers().writeInteger(MipsRegisters.V0, -1);
+                                return;
+                            }
+                        }
+                    }
+                    cpu.addMemoryHandler(addr, new RemapHandler(target, size));
+                    cpu.registers().writeInteger(MipsRegisters.V0, 0);
+                    return;
                 }
                 default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
             }

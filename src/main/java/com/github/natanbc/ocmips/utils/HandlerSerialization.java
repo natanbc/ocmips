@@ -7,6 +7,7 @@ import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
 import com.github.natanbc.ocmips.handlers.DriveHandler;
 import com.github.natanbc.ocmips.handlers.EEPROMHandler;
 import com.github.natanbc.ocmips.handlers.FramebufferHandler;
+import com.github.natanbc.ocmips.handlers.RemapHandler;
 import li.cil.oc.api.machine.Machine;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -72,6 +73,13 @@ public class HandlerSerialization {
             h.save(tag);
             return;
         }
+        if(handler instanceof RemapHandler) {
+            RemapHandler h = (RemapHandler)handler;
+            tag.setString("type", "remap");
+            tag.setInteger("target", h.getTarget());
+            tag.setInteger("size", h.getSize());
+            return;
+        }
         if(handler instanceof BadAppleHandler) {
             tag.setString("type", "bad_apple");
             return;
@@ -111,6 +119,11 @@ public class HandlerSerialization {
                 );
                 h.restore(tag);
                 return h;
+            }
+            case "remap": {
+                return new RemapHandler(
+                        tag.getInteger("target"), tag.getInteger("size")
+                );
             }
             case "bad_apple": {
                 return new BadAppleHandler();
