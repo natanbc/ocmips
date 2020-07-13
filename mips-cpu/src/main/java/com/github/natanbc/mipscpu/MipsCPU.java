@@ -66,10 +66,7 @@ public class MipsCPU {
         //haha icache go brrrr
         //jk we don't have those fancy things here
         //we're a simple cpu
-        //and we like to spam allocations
-        //sorry gc <3
-        MipsInstruction i = MipsInstruction.decode(readWord(registers.readInteger(MipsRegisters.PC)));
-        i.execute(this);
+        MipsInstruction.execute(this, readWord(registers.readInteger(MipsRegisters.PC)));
         if(!registers.wasPcWritten()) {
             registers.writeInteger(MipsRegisters.PC, registers.readInteger(MipsRegisters.PC) + 4);
         }

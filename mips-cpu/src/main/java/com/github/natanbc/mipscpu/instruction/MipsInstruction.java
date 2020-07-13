@@ -2,1042 +2,477 @@ package com.github.natanbc.mipscpu.instruction;
 
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.MipsException;
+import com.github.natanbc.mipscpu.MipsRegisters;
 
 import static com.github.natanbc.mipscpu.MipsRegisters.*;
 
-public interface MipsInstruction {
-    void execute(MipsCPU cpu) throws MipsException;
-
-    static MipsInstruction decode(int encoding) {
-        return MipsDecoder.decode(encoding);
-    }
-
-    //http://www.mrc.uidaho.edu/mrc/people/jff/digital/MIPSir.html
-
-    class Add implements MipsInstruction {
-        private final int d, s, t;
-
-        public Add(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(s) + cpu.registers().readInteger(t));
-            //TODO overflow check
-        }
-
-        @Override
-        public String toString() {
-            return "add $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class Addi implements MipsInstruction {
-        private final int t, s, imm;
-
-        public Addi(int t, int s, int imm) {
-            this.t = t;
-            this.s = s;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(t, cpu.registers().readInteger(s) + imm);
-            //TODO overflow check
-        }
-
-        @Override
-        public String toString() {
-            return "addi $" + t + ", $" + s + ", " + imm;
-        }
-    }
-
-    class Addiu implements MipsInstruction {
-        private final int t, s, imm;
-
-        public Addiu(int t, int s, int imm) {
-            this.t = t;
-            this.s = s;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(t, cpu.registers().readInteger(s) + imm);
-        }
-
-        @Override
-        public String toString() {
-            return "addiu $" + t + ", $" + s + ", " + imm;
-        }
-    }
-
-    class Addu implements MipsInstruction {
-        private final int d, s, t;
-
-        public Addu(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(s) + cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "addu $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class And implements MipsInstruction {
-        private final int d, s, t;
-
-        public And(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(s) & cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "and $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class Andi implements MipsInstruction {
-        private final int t, s, imm;
-
-        public Andi(int t, int s, int imm) {
-            this.t = t;
-            this.s = s;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(t, cpu.registers().readInteger(s) & imm);
-        }
-
-        @Override
-        public String toString() {
-            return "andi $" + t + ", $" + s + ", " + imm;
-        }
-    }
-
-    class Beq implements MipsInstruction {
-        private final int s, t, offset;
-
-        public Beq(int s, int t, int offset) {
-            this.s = s;
-            this.t = t;
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) == cpu.registers().readInteger(t)) {
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+public class MipsInstruction {
+    public static void execute(MipsCPU cpu, int instruction) throws MipsException {
+        switch (instruction >>> 26) {
+            case 0: executeOpcode0(cpu, instruction); break;
+            // j <imm26>
+            case 2: {
+                int offset = (instruction << 6) >>> 6;
+                int pc = cpu.registers().readInteger(PC);
+                //PC = nPC;
+                pc += 4;
+                //nPC = (PC & 0xf0000000) | (target << 2)
+                cpu.registers().writeInteger(PC, (pc & 0xf0000000) | (offset << 2));
+                break;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "beq $" + s + ", $" + t + ", " + offset;
-        }
-    }
-
-    class Bgez implements MipsInstruction {
-        private final int s, offset;
-
-        public Bgez(int s, int offset) {
-            this.s = s;
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) >= 0) {
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+            // jal <imm26>
+            case 3: {
+                int offset = (instruction << 6) >>> 6;
+                int pc = cpu.registers().readInteger(PC);
+                cpu.registers().writeInteger(RA, pc + 8);
+                //PC = nPC;
+                pc += 4;
+                //nPC = (PC & 0xf0000000) | (target << 2)
+                cpu.registers().writeInteger(PC, (pc & 0xf0000000) | (offset << 2));
+                break;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "bgez $" + s + ", " + offset;
+            default: executeI(cpu, instruction);
         }
     }
 
-    class Bgezal implements MipsInstruction {
-        private final int s, offset;
-
-        public Bgezal(int s, int offset) {
-            this.s = s;
-            this.offset = offset;
+    public static String toString(int instruction) {
+        switch (instruction >>> 26) {
+            case 0: return toStringOpcode0(instruction);
+            case 2: return "j " + ((instruction << 6) >>> 6);
+            case 3: return "jal " + ((instruction << 6) >>> 6);
+            default: return toStringI(instruction);
         }
+    }
 
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) >= 0) {
-                cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+    @SuppressWarnings("DuplicateBranchesInSwitch")
+    private static void executeOpcode0(MipsCPU cpu, int instruction) throws MipsException {
+        int func =   instruction & 0b111111;
+        int rd =    (instruction << 16) >>> 27;
+        int rs =    (instruction <<  6) >>> 27;
+        int rt =    (instruction << 11) >>> 27;
+        int shamt = (instruction << 21) >>> 27;
+        switch (func) {
+            //add
+            case 0b100000:  {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rs) + cpu.registers().readInteger(rt));
+                //TODO overflow check
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "bgezal $" + s + ", " + offset;
-        }
-    }
-
-    class Bgtz implements MipsInstruction {
-        private final int s, offset;
-
-        public Bgtz(int s, int offset) {
-            this.s = s;
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) > 0) {
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+            //addu
+            case 0b100001: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rs) + cpu.registers().readInteger(rt));
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "bgtz $" + s + ", " + offset;
-        }
-    }
-
-    class Blez implements MipsInstruction {
-        private final int s, offset;
-
-        public Blez(int s, int offset) {
-            this.s = s;
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) <= 0) {
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+            //and
+            case 0b100100: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rs) & cpu.registers().readInteger(rt));
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "blez $" + s + ", " + offset;
-        }
-    }
-
-    class Bltz implements MipsInstruction {
-        private final int s, offset;
-
-        public Bltz(int s, int offset) {
-            this.s = s;
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) < 0) {
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+            //div
+            case 0b011010: {
+                int a = cpu.registers().readInteger(rs);
+                int b = cpu.registers().readInteger(rt);
+                cpu.registers().writeInteger(LO, a / b);
+                cpu.registers().writeInteger(HI, a % b);
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "bltz $" + s + ", " + offset;
-        }
-    }
-
-    class Bltzal implements MipsInstruction {
-        private final int s, offset;
-
-        public Bltzal(int s, int offset) {
-            this.s = s;
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) < 0) {
-                cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+            //divu
+            case 0b011011: {
+                int a = cpu.registers().readInteger(rs);
+                int b = cpu.registers().readInteger(rt);
+                cpu.registers().writeInteger(LO, Integer.divideUnsigned(a, b));
+                cpu.registers().writeInteger(HI, Integer.remainderUnsigned(a, b));
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "bltzal $" + s + ", " + offset;
-        }
-    }
-
-    class Bne implements MipsInstruction {
-        private final int s, t, offset;
-
-        public Bne(int s, int t, int offset) {
-            this.s = s;
-            this.t = t;
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) != cpu.registers().readInteger(t)) {
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (offset << 2));
+            //jalr
+            case 0b001001: {
+                int temp = cpu.registers().readInteger(rs);
+                cpu.registers().writeInteger(rd, cpu.registers().readInteger(PC) + 8);
+                cpu.registers().writeInteger(PC, temp);
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "bne $" + s + ", $" + t + ", " + offset;
-        }
-    }
-
-    class Div implements MipsInstruction {
-        private final int s, t;
-
-        public Div(int s, int t) {
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            int a = cpu.registers().readInteger(s);
-            int b = cpu.registers().readInteger(t);
-            cpu.registers().writeInteger(LO, a / b);
-            cpu.registers().writeInteger(HI, a % b);
-        }
-
-        @Override
-        public String toString() {
-            return "div $" + s + ", $" + t;
-        }
-    }
-
-    class Divu implements MipsInstruction {
-        private final int s, t;
-
-        public Divu(int s, int t) {
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            int a = cpu.registers().readInteger(s);
-            int b = cpu.registers().readInteger(t);
-            cpu.registers().writeInteger(LO, Integer.divideUnsigned(a, b));
-            cpu.registers().writeInteger(HI, Integer.remainderUnsigned(a, b));
-        }
-
-        @Override
-        public String toString() {
-            return "divu $" + s + ", $" + t;
-        }
-    }
-
-    class J implements MipsInstruction {
-        private final int offset;
-
-        public J(int offset) {
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            int pc = cpu.registers().readInteger(PC);
-            //PC = nPC;
-            pc += 4;
-            //nPC = (PC & 0xf0000000) | (target << 2)
-            cpu.registers().writeInteger(PC, (pc & 0xf0000000) | (offset << 2));
-        }
-
-        @Override
-        public String toString() {
-            return "j " + offset;
-        }
-    }
-
-    class Jal implements MipsInstruction {
-        private final int offset;
-
-        public Jal(int offset) {
-            this.offset = offset;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            int pc = cpu.registers().readInteger(PC);
-            cpu.registers().writeInteger(RA, pc + 8);
-            //PC = nPC;
-            pc += 4;
-            //nPC = (PC & 0xf0000000) | (target << 2)
-            cpu.registers().writeInteger(PC, (pc & 0xf0000000) | (offset << 2));
-        }
-
-        @Override
-        public String toString() {
-            return "jal " + offset;
-        }
-    }
-
-    class Jalr implements MipsInstruction {
-        private final int s, d;
-
-        public Jalr(int s, int d) {
-            this.s = s;
-            this.d = d;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            int temp = cpu.registers().readInteger(s);
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(PC) + 8);
-            cpu.registers().writeInteger(PC, temp);
-        }
-
-        @Override
-        public String toString() {
-            return "jalr $" + s + ", $" + d;
-        }
-    }
-
-    class Jr implements MipsInstruction {
-        private final int s;
-
-        public Jr(int s) {
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(PC, cpu.registers().readInteger(s));
-        }
-
-        @Override
-        public String toString() {
-            return "jr $" + s;
-        }
-    }
-
-    class Lb implements MipsInstruction {
-        private final int t, offset, s;
-
-        public Lb(int t, int offset, int s) {
-            this.t = t;
-            this.offset = offset;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            int address = cpu.registers().readInteger(s) + offset;
-            //cast to byte to sign-extend
-            cpu.registers().writeInteger(t, (byte)cpu.readByte(address));
-        }
-
-        @Override
-        public String toString() {
-            return "lb $" + t + ", " + offset + "($" + s + ")";
-        }
-    }
-
-    class Lbu implements MipsInstruction {
-        private final int t, offset, s;
-
-        public Lbu(int t, int offset, int s) {
-            this.t = t;
-            this.offset = offset;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            int address = cpu.registers().readInteger(s) + offset;
-            cpu.registers().writeInteger(t, cpu.readByte(address) & 0xFF);
-        }
-
-        @Override
-        public String toString() {
-            return "lbu $" + t + ", " + offset + "($" + s + ")";
-        }
-    }
-
-    class Lui implements MipsInstruction {
-        private final int t, imm;
-
-        public Lui(int t, int imm) {
-            this.t = t;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(t, imm << 16);
-        }
-
-        @Override
-        public String toString() {
-            return "lui $" + t + ", " + imm;
-        }
-    }
-
-    class Lw implements MipsInstruction {
-        private final int t, offset, s;
-
-        public Lw(int t, int offset, int s) {
-            this.t = t;
-            this.offset = offset;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            int addr = cpu.registers().readInteger(s) + offset;
-            if((addr & ~0b11) != addr) {
-                throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
+            //jr
+            case 0b001000: {
+                cpu.registers().writeInteger(PC, cpu.registers().readInteger(rs));
+                return;
             }
-            cpu.registers().writeInteger(t, cpu.readWord(addr));
-        }
-
-        @Override
-        public String toString() {
-            return "lw $" + t + ", " + offset + "($" + s + ")";
-        }
-    }
-    
-    class Mfhi implements MipsInstruction {
-        private final int d;
-
-        public Mfhi(int d) {
-            this.d = d;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(HI));
-        }
-
-        @Override
-        public String toString() {
-            return "mfhi $" + d;
-        }
-    }
-
-    class Mflo implements MipsInstruction {
-        private final int d;
-
-        public Mflo(int d) {
-            this.d = d;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(LO));
-        }
-
-        @Override
-        public String toString() {
-            return "mflo $" + d;
-        }
-    }
-
-    class Mult implements MipsInstruction {
-        private final int s, t;
-
-        public Mult(int s, int t) {
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(LO, cpu.registers().readInteger(s) * cpu.registers().readInteger(t));
-            //TODO overflow check
-        }
-
-        @Override
-        public String toString() {
-            return "mult $" + s + ", $" + t;
-        }
-    }
-
-    class Multu implements MipsInstruction {
-        private final int s, t;
-
-        public Multu(int s, int t) {
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(LO, cpu.registers().readInteger(s) * cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "multu $" + s + ", $" + t;
-        }
-    }
-
-    class Or implements MipsInstruction {
-        private final int d, s, t;
-
-        public Or(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(s) | cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "or $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class Ori implements MipsInstruction {
-        private final int t, s, imm;
-
-        public Ori(int t, int s, int imm) {
-            this.t = t;
-            this.s = s;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(t, cpu.registers().readInteger(s) | imm);
-        }
-
-        @Override
-        public String toString() {
-            return "ori $" + t + ", $" + s + ", " + imm;
-        }
-    }
-
-    class Sb implements MipsInstruction {
-        private final int t, offset, s;
-
-        public Sb(int t, int offset, int s) {
-            this.t = t;
-            this.offset = offset;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            cpu.writeByte(cpu.registers().readInteger(s) + offset, 0xFF & cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "sb $" + t + ", " + offset + "($" + s + ")";
-        }
-    }
-
-    class Sll implements MipsInstruction {
-        private final int d, t, h;
-
-        public Sll(int d, int t, int h) {
-            this.d = d;
-            this.t = t;
-            this.h = h;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(t) << h);
-        }
-
-        @Override
-        public String toString() {
-            return "sll $" + d + ", $" + t + ", " + h;
-        }
-    }
-
-    class Sllv implements MipsInstruction {
-        private final int d, t, s;
-
-        public Sllv(int d, int t, int s) {
-            this.d = d;
-            this.t = t;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(t) << cpu.registers().readInteger(s));
-        }
-
-        @Override
-        public String toString() {
-            return "sllv $" + d + ", $" + t + ", $" + s;
-        }
-    }
-
-    class Slt implements MipsInstruction {
-        private final int d, s, t;
-
-        public Slt(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) < cpu.registers().readInteger(t)) {
-                cpu.registers().writeInteger(d, 1);
-            } else {
-                cpu.registers().writeInteger(d, 0);
+            //mfhi
+            case 0b010000: {
+                cpu.registers().writeInteger(rd, cpu.registers().readInteger(HI));
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "slt $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class Slti implements MipsInstruction {
-        private final int t, s, imm;
-
-        public Slti(int t, int s, int imm) {
-            this.t = t;
-            this.s = s;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) < imm) {
-                cpu.registers().writeInteger(t, 1);
-            } else {
-                cpu.registers().writeInteger(t, 0);
+            //mflo
+            case 0b010010: {
+                cpu.registers().writeInteger(rd, cpu.registers().readInteger(LO));
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "slti $" + t + ", $" + s + ", " + imm;
-        }
-    }
-
-    class Sltiu implements MipsInstruction {
-        private final int t, s, imm;
-
-        public Sltiu(int t, int s, int imm) {
-            this.t = t;
-            this.s = s;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            if(cpu.registers().readInteger(s) < imm) {
-                cpu.registers().writeInteger(t, 1);
-            } else {
-                cpu.registers().writeInteger(t, 0);
+            //mult
+            case 0b011000: {
+                cpu.registers().writeInteger(LO,
+                        cpu.registers().readInteger(rs) * cpu.registers().readInteger(rt));
+                //TODO overflow check
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "sltiu $" + t + ", $" + s + ", " + imm;
-        }
-    }
-
-    class Sltu implements MipsInstruction {
-        private final int d, s, t;
-
-        public Sltu(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            int cmp = Integer.compareUnsigned(cpu.registers().readInteger(s), cpu.registers().readInteger(t));
-            if(cmp < 0) {
-                cpu.registers().writeInteger(d, 1);
-            } else {
-                cpu.registers().writeInteger(d, 0);
+            //multu
+            case 0b011001: {
+                cpu.registers().writeInteger(LO,
+                        cpu.registers().readInteger(rs) * cpu.registers().readInteger(rt));
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "sltu $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class Sra implements MipsInstruction {
-        private final int d, t, h;
-
-        public Sra(int d, int t, int h) {
-            this.d = d;
-            this.t = t;
-            this.h = h;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(t) >> h);
-        }
-
-        @Override
-        public String toString() {
-            return "sra $" + d + ", $" + t + ", " + h;
-        }
-    }
-
-    class Srav implements MipsInstruction {
-        private final int d, t, s;
-
-        public Srav(int d, int t, int s) {
-            this.d = d;
-            this.t = t;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(t) >> cpu.registers().readInteger(s));
-        }
-
-        @Override
-        public String toString() {
-            return "srav $" + d + ", $" + t + ", $" + s;
-        }
-    }
-
-    class Srl implements MipsInstruction {
-        private final int d, t, h;
-
-        public Srl(int d, int t, int h) {
-            this.d = d;
-            this.t = t;
-            this.h = h;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(t) >>> h);
-        }
-
-        @Override
-        public String toString() {
-            return "srl $" + d + ", $" + t + ", " + h;
-        }
-    }
-
-    class Srlv implements MipsInstruction {
-        private final int d, t, s;
-
-        public Srlv(int d, int t, int s) {
-            this.d = d;
-            this.t = t;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(t) >>> cpu.registers().readInteger(s));
-        }
-
-        @Override
-        public String toString() {
-            return "srlv $" + d + ", $" + t + ", $" + s;
-        }
-    }
-
-    class Sub implements MipsInstruction {
-        private final int d, s, t;
-
-        public Sub(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(s) - cpu.registers().readInteger(t));
-            //TODO overflow check
-        }
-
-        @Override
-        public String toString() {
-            return "sub $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class Subu implements MipsInstruction {
-        private final int d, s, t;
-
-        public Subu(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(s) - cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "subu $" + d + ", $" + s + ", $" + t;
-        }
-    }
-
-    class Sw implements MipsInstruction {
-        private final int t, offset, s;
-
-        public Sw(int t, int offset, int s) {
-            this.t = t;
-            this.offset = offset;
-            this.s = s;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            int addr = cpu.registers().readInteger(s) + offset;
-            if((addr & ~0b11) != addr) {
-                throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+            //or
+            case 0b100101: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rs) | cpu.registers().readInteger(rt));
+                return;
             }
-            cpu.writeWord(addr, cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "sw $" + t + ", " + offset + "($" + s + ")";
-        }
-    }
-
-    class Syscall implements MipsInstruction {
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            SyscallHandler h = cpu.getSyscallHandler();
-            if(h == null) {
-                throw new InstructionExecutionException("No syscall handler set!");
+            //sll
+            case 0b000000: {
+                cpu.registers().writeInteger(rd, cpu.registers().readInteger(rt) << shamt);
+                return;
             }
-            try {
-                h.handleSyscall(cpu);
-            } catch (RuntimeException e) {
-                cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4);
-                throw e;
+            //sllv
+            case 0b000100: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rt) << cpu.registers().readInteger(rs));
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "syscall";
-        }
-    }
-
-    class Teq implements MipsInstruction {
-        private final int s, t;
-
-        public Teq(int s, int t) {
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            if(cpu.registers().readInteger(s) == cpu.registers().readInteger(t)) {
-                throw new TrapException(this, 0);
+            //slt
+            case 0b101010: {
+                if(cpu.registers().readInteger(rs) < cpu.registers().readInteger(rt)) {
+                    cpu.registers().writeInteger(rd, 1);
+                } else {
+                    cpu.registers().writeInteger(rd, 0);
+                }
+                return;
             }
-        }
-
-        @Override
-        public String toString() {
-            return "teq $" + s + ", $" + t;
+            //sltu
+            case 0b101011: {
+                int cmp = Integer.compareUnsigned(cpu.registers().readInteger(rs), cpu.registers().readInteger(rt));
+                if(cmp < 0) {
+                    cpu.registers().writeInteger(rd, 1);
+                } else {
+                    cpu.registers().writeInteger(rd, 0);
+                }
+                return;
+            }
+            //sra
+            case 0b000011: {
+                cpu.registers().writeInteger(rd, cpu.registers().readInteger(rt) >> shamt);
+                return;
+            }
+            //srav
+            case 0b000111: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rt) >> cpu.registers().readInteger(rs));
+                return;
+            }
+            //srl
+            case 0b000010: {
+                cpu.registers().writeInteger(rd, cpu.registers().readInteger(rt) >>> shamt);
+                return;
+            }
+            //srlv
+            case 0b000110: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rt) >>> cpu.registers().readInteger(rs));
+                return;
+            }
+            //sub
+            case 0b100010: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rs) - cpu.registers().readInteger(rt));
+                //TODO overflow check
+                return;
+            }
+            //subu
+            case 0b100011: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rs) - cpu.registers().readInteger(rt));
+                return;
+            }
+            //syscall
+            case 0b001100: {
+                SyscallHandler h = cpu.getSyscallHandler();
+                if(h == null) {
+                    throw new InstructionExecutionException("No syscall handler set!");
+                }
+                try {
+                    h.handleSyscall(cpu);
+                } catch (RuntimeException e) {
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4);
+                    throw e;
+                }
+                return;
+            }
+            //teq
+            case 0b110100: {
+                if(cpu.registers().readInteger(rs) == cpu.registers().readInteger(rt)) {
+                    throw new TrapException(instruction, 0);
+                }
+                return;
+            }
+            //xor
+            case 0b100110: {
+                cpu.registers().writeInteger(rd,
+                        cpu.registers().readInteger(rs) ^ cpu.registers().readInteger(rt));
+                return;
+            }
+            default: throw new IllegalInstructionException(instruction, "Unknown func " + func);
         }
     }
 
-    class Xor implements MipsInstruction {
-        private final int d, s, t;
-
-        public Xor(int d, int s, int t) {
-            this.d = d;
-            this.s = s;
-            this.t = t;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(d, cpu.registers().readInteger(s) ^ cpu.registers().readInteger(t));
-        }
-
-        @Override
-        public String toString() {
-            return "xor $" + d + ", $" + s + ", $" + t;
+    @SuppressWarnings("DuplicateBranchesInSwitch")
+    private static void executeI(MipsCPU cpu, int instruction) throws MipsException {
+        int rs =  (instruction <<  6) >>> 27;
+        int rt =  (instruction << 11) >>> 27;
+        int imm = instruction & 0xFFFF;
+        //andi, ori, xori, lui must NOT be sign extended
+        //addi[u], lw, sw, relative branches, slti[u] must be sign extended
+        switch (instruction >>> 26) {
+            //addi
+            case 0b001000: {
+                cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) + signExtend(imm));
+                //TODO overflow check
+                return;
+            }
+            //addiu
+            case 0b001001: {
+                cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) + signExtend(imm));
+                return;
+            }
+            //andi
+            case 0b001100: {
+                cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) & imm);
+                return;
+            }
+            //beq
+            case 0b000100: {
+                if(cpu.registers().readInteger(rs) == cpu.registers().readInteger(rt)) {
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                }
+                return;
+            }
+            //bgez, bgezal, bltz, bltzal
+            case 0b000001:
+                switch(rt) {
+                    //bgez
+                    case 0b00001: {
+                        if(cpu.registers().readInteger(rs) >= 0) {
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                        }
+                        return;
+                    }
+                    //bgezal
+                    case 0b10001: {
+                        if(cpu.registers().readInteger(rs) >= 0) {
+                            cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                        }
+                        return;
+                    }
+                    //bltz
+                    case 0b00000: {
+                        if(cpu.registers().readInteger(rs) < 0) {
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                        }
+                        return;
+                    }
+                    //bltzal
+                    case 0b10000: {
+                        if(cpu.registers().readInteger(rs) < 0) {
+                            cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                        }
+                        return;
+                    }
+                    default: throw new IllegalInstructionException(instruction, "Unknown branch type " + Integer.toBinaryString(rt));
+                }
+                //bgtz
+            case 0b000111: {
+                if(cpu.registers().readInteger(rs) > 0) {
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                }
+                return;
+            }
+            //blez
+            case 0b000110: {
+                if(cpu.registers().readInteger(rs) <= 0) {
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                }
+                return;
+            }
+            //bne
+            case 0b000101: {
+                if(cpu.registers().readInteger(rs) != cpu.registers().readInteger(rt)) {
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                }
+                return;
+            }
+            //lb
+            case 0b100000: {
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                //cast to byte to sign-extend
+                cpu.registers().writeInteger(rt, (byte)cpu.readByte(address));
+                return;
+            }
+            //lbu
+            case 0b100100: {
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                cpu.registers().writeInteger(rt, cpu.readByte(address) & 0xFF);
+                return;
+            }
+            //lui
+            case 0b001111: {
+                cpu.registers().writeInteger(rt, imm << 16);
+                return;
+            }
+            //lw
+            case 0b100011: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((addr & ~0b11) != addr) {
+                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
+                }
+                cpu.registers().writeInteger(rt, cpu.readWord(addr));
+                return;
+            }
+            //ori
+            case 0b001101: {
+                cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) | imm);
+                return;
+            }
+            //sb
+            case 0b101000: {
+                cpu.writeByte(cpu.registers().readInteger(rs) + signExtend(imm),
+                        0xFF & cpu.registers().readInteger(rt));
+                return;
+            }
+            //slti
+            case 0b001010: {
+                if(cpu.registers().readInteger(rs) < signExtend(imm)) {
+                    cpu.registers().writeInteger(rt, 1);
+                } else {
+                    cpu.registers().writeInteger(rt, 0);
+                }
+                return;
+            }
+            //sltiu
+            case 0b001011: {
+                if(cpu.registers().readInteger(rs) < signExtend(imm)) {
+                    cpu.registers().writeInteger(rt, 1);
+                } else {
+                    cpu.registers().writeInteger(rt, 0);
+                }
+                return;
+            }
+            //sw
+            case 0b101011: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((addr & ~0b11) != addr) {
+                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                }
+                cpu.writeWord(addr, cpu.registers().readInteger(rt));
+                return;
+            }
+            //xori
+            case 0b001110: {
+                cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) ^ imm);
+                return;
+            }
+            default: throw new IllegalInstructionException(instruction, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
         }
     }
 
-    class Xori implements MipsInstruction {
-        private final int t, s, imm;
-
-        public Xori(int t, int s, int imm) {
-            this.t = t;
-            this.s = s;
-            this.imm = imm;
-        }
-
-        @Override
-        public void execute(MipsCPU cpu) {
-            cpu.registers().writeInteger(t, cpu.registers().readInteger(s) ^ imm);
-        }
-
-        @Override
-        public String toString() {
-            return "xori $" + t + ", $" + s + ", " + imm;
+    private static String toStringOpcode0(int instruction) {
+        int func =   instruction & 0b111111;
+        int rd =    (instruction << 16) >>> 27;
+        int rs =    (instruction <<  6) >>> 27;
+        int rt =    (instruction << 11) >>> 27;
+        int shamt = (instruction << 21) >>> 27;
+        switch (func) {
+            case 0b100000: return "add " + iregs(rd, rs, rt);
+            case 0b100001: return "addu " + iregs(rd, rs, rt);
+            case 0b100100: return "and " + iregs(rd, rs, rt);
+            case 0b011010: return "div " + iregs(rs, rt);
+            case 0b011011: return "divu " + iregs(rs, rt);
+            case 0b001001: return "jalr " + iregs(rs, rd);
+            case 0b001000: return "jr " + ir(rs);
+            case 0b010000: return "mfhi " + ir(rd);
+            case 0b010010: return "mflo " + ir(rd);
+            case 0b011000: return "mult " + iregs(rs, rt);
+            case 0b011001: return "multu " + iregs(rs, rt);
+            case 0b100101: return "or " + iregs(rd, rs, rt);
+            case 0b000000: return "sll " + iregs(rd, rt) + ", " + shamt;
+            case 0b000100: return "sllv " + iregs(rd, rs, rt);
+            case 0b101010: return "slt " + iregs(rd, rs, rt);
+            case 0b101011: return "sltu " + iregs(rd, rs, rt);
+            case 0b000011: return "sra " + iregs(rd, rt) + ", " + shamt;
+            case 0b000111: return "srav " + iregs(rd, rt, rs);
+            case 0b000010: return "srl " + iregs(rd, rt) + ", " + shamt;
+            case 0b000110: return "srlv " + iregs(rd, rt, rs);
+            case 0b100010: return "sub " + iregs(rd, rs, rt);
+            case 0b100011: return "subu " + iregs(rd, rs, rt);
+            case 0b001100: return "syscall";
+            case 0b110100: return "teq " + iregs(rs, rt);
+            case 0b100110: return "xor " + iregs(rd, rs, rt);
+            default: return invalid(instruction, "Unknown func " + func);
         }
     }
 
-    class Invalid implements MipsInstruction {
-        private final int encoding;
-        private final String reason;
-
-        public Invalid(int encoding, String reason) {
-            this.encoding = encoding;
-            this.reason = reason;
+    private static String toStringI(int instruction) {
+        int rs =  (instruction <<  6) >>> 27;
+        int rt =  (instruction << 11) >>> 27;
+        int imm = instruction & 0xFFFF;
+        //andi, ori, xori must NOT be sign extended
+        //addi[u], lw, sw, relative branches, slti[u] must be sign extended
+        switch (instruction >>> 26) {
+            case 0b001000: return "addi " + iregs(rt, rs) + ", " + signExtend(imm);
+            case 0b001001: return "addiu " + iregs(rt, rs) + ", " + signExtend(imm);
+            case 0b001100: return "andi " + iregs(rt, rs) + ", " + imm;
+            case 0b000100: return "beq " + iregs(rs, rt) + ", " + signExtend(imm);
+            case 0b000001:
+                switch (rt) {
+                    case 0b00001: return "bgez " + ir(rs) + ", " + signExtend(imm);
+                    case 0b10001: return "bgezal " + ir(rs) + ", " + signExtend(imm);
+                    case 0b00000: return "bltz " + ir(rs) + ", " + signExtend(imm);
+                    case 0b10000: return "bltzal " + ir(rs) + ", " + signExtend(imm);
+                    default: return invalid(instruction, "Unknown branch type " + Integer.toBinaryString(rt));
+                }
+            case 0b000111: return "bgtz " + ir(rs) + ", " + signExtend(imm);
+            case 0b000110: return "blez " + ir(rs) + ", " + signExtend(imm);
+            case 0b000101: return "bne " + iregs(rs, rt) + ", " + signExtend(imm);
+            case 0b100000: return "lb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b100100: return "lbu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b001111: return "lui " + ir(rt) + ", " + imm;
+            case 0b100011: return "lw " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b001101: return "ori " + iregs(rt, rs) + ", " + imm;
+            case 0b101000: return "sb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b001010: return "slti " + iregs(rt, rs) + ", " + signExtend(imm);
+            case 0b001011: return "sltiu " + iregs(rt, rs) + ", " + signExtend(imm);
+            case 0b101011: return "sw " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b001110: return "xori " + iregs(rt, rs) + ", " + imm;
+            default: return invalid(instruction, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
         }
+    }
 
-        @Override
-        public void execute(MipsCPU cpu) throws MipsException {
-            throw new IllegalInstructionException(encoding, reason);
-        }
+    private static String invalid(int instruction, String reason) {
+        return "Invalid instruction " + Integer.toHexString(instruction) + ": " + reason;
+    }
 
-        @Override
-        public String toString() {
-            return "Invalid instruction " + Integer.toHexString(encoding) + ": " + reason;
-        }
+    private static String iregs(int a, int b, int c) {
+        return String.join(", ", ir(a), ir(b), ir(c));
+    }
+
+    private static String iregs(int a, int b) {
+        return String.join(", ", ir(a), ir(b));
+    }
+
+    //*i*nteger *r*egister
+    private static String ir(int r) { return MipsRegisters.integerName(r); }
+
+    private static int signExtend(int imm) {
+        return (short)imm;
     }
 }

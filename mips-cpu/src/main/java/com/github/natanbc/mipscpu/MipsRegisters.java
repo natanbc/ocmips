@@ -14,6 +14,17 @@ public class MipsRegisters {
             //following registers can't be encoded directly
             PC =   32, LO = 33, HI = 34;
     public static final int INTEGER_COUNT = 35;
+    private static final String[] INTEGER_NAMES = {
+            "$zero", "$at", "$v0", "$v1",
+            "$a0", "$a1", "$a2", "$a3",
+            "$t0", "$t1", "$t2", "$t3",
+            "$t4", "$t5", "$t6", "$t7",
+            "$s0", "$s1", "$s2", "$s3",
+            "$s4", "$s5", "$s6", "$s7",
+            "$t8", "$t9", "$k0", "$k1",
+            "$gp", "$sp", "$fp", "$ra",
+            "<pc>", "<lo>", "<hi>"
+    };
     // mnemonics for floating point registers
     public static final int
             F0 =   0, F1 =   1, F2 =   2, F3 =   3,
@@ -25,6 +36,16 @@ public class MipsRegisters {
             F24 = 24, F25 = 25, F26 = 26, F27 = 27,
             F28 = 28, F29 = 29, F30 = 30, F31 = 31;
     public static final int FLOAT_COUNT = 32;
+    private static final String[] FLOAT_NAMES = {
+            "$f0",  "$f1",  "$f2",  "$f3",
+            "$f4",  "$f5",  "$f6",  "$f7",
+            "$f8",  "$f9",  "$f10", "$f11",
+            "$f12", "$f13", "$f14", "$f15",
+            "$f16", "$f17", "$f18", "$f19",
+            "$f20", "$f21", "$f22", "$f23",
+            "$f24", "$f25", "$f26", "$f27",
+            "$f28", "$f29", "$f30", "$f31",
+    };
 
     // used by interpreter to detect writes to $pc
     public static final int FLAG_PC_WRITTEN = 0x01;
@@ -60,5 +81,19 @@ public class MipsRegisters {
 
     public void writeFloat(int register, float value) {
         fpRegisters[register] = value;
+    }
+
+    public static String integerName(int reg) {
+        if(reg >= 0 && reg < INTEGER_NAMES.length) {
+            return INTEGER_NAMES[reg];
+        }
+        return "<invalid>";
+    }
+
+    public static String floatName(int reg) {
+        if(reg >= 0 && reg < FLOAT_NAMES.length) {
+            return FLOAT_NAMES[reg];
+        }
+        return "<invalid>";
     }
 }
