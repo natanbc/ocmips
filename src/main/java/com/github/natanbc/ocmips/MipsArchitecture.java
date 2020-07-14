@@ -352,6 +352,8 @@ public class MipsArchitecture implements Architecture {
                         System.out.printf("[dbg] %s: %s\n", msg, MemoryUtils.readString(cpu, val));
                     } else if(type == ConversionHelpers.TYPE_ADDRESS) {
                         System.out.printf("[dbg] %s: %s\n", msg, MemoryUtils.readAddress(cpu, val));
+                    } else if(type == ConversionHelpers.TYPE_BYTE_ARRAY) {
+                        System.out.printf("[dbg] %s: %s\n", msg, java.util.Arrays.toString(MemoryUtils.readByteArray(cpu, val)));
                     } else {
                         System.out.printf("[dbg] %s: %d (0x%x)\n", msg, val, val);
                     }
@@ -381,6 +383,12 @@ public class MipsArchitecture implements Architecture {
                     }
                     cpu.addMemoryHandler(addr, new RemapHandler(target, size));
                     cpu.registers().writeInteger(MipsRegisters.V0, 0);
+                    return;
+                }
+                //ramsize
+                //returns available ram in $v0
+                case 11: {
+                    cpu.registers().writeInteger(MipsRegisters.V0, ramWords * 4);
                     return;
                 }
                 default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
