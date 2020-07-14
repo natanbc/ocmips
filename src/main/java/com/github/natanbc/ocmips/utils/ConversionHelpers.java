@@ -16,7 +16,8 @@ public class ConversionHelpers {
             TYPE_ADDRESS = 4,
             TYPE_NULL = 5,
             TYPE_SHORT = 6,
-            TYPE_BOOLEAN = 7;
+            TYPE_BOOLEAN = 7,
+            TYPE_BYTE_ARRAY = 8;
 
     // struct retval { word type, word value, word next }
     public static int writeObjectsToMemory(MipsCPU cpu, Object[] arr, int addr, int size) throws MemoryOperationException {
@@ -25,10 +26,10 @@ public class ConversionHelpers {
         int prev = 0;
         if(arr != null) {
             for(Object v : arr) {
-                if(addr + 12 >= end) break;
+                if(addr + 12 > end) break;
                 int type = typeOf(v);
                 IntBuffer buffer = toBuffer(v);
-                if(buffer != null && addr + 12 + buffer.capacity() * 4 >= end) {
+                if(buffer != null && addr + 12 + buffer.capacity() * 4 > end) {
                     break;
                 }
                 if(prev != 0) {
@@ -38,7 +39,7 @@ public class ConversionHelpers {
                 cpu.writeWord(prev, type);
                 cpu.writeWord(prev + 8, 0);
                 addr += 12; //size of this retval
-                if(type == TYPE_INTEGER || type == TYPE_FLOAT || type == TYPE_NULL || type == TYPE_SHORT) {
+                if(isWordSize(type)) {
                     cpu.writeWord(prev + 4, buffer == null ? 0 : buffer.get(0));
                 } else {
                     if(buffer == null) throw new AssertionError();
@@ -92,6 +93,15 @@ public class ConversionHelpers {
                         .asIntBuffer();
             }
         }
+        if(value instanceof byte[]) {
+            byte[] array = (byte[])value;
+            ByteBuffer buffer = MemoryUtils.allocateRounding(array.length + 4);
+            buffer.position(4);
+            buffer.put(array);
+            buffer.position(0);
+            return buffer.asIntBuffer()
+                    .put(0, array.length);
+        }
         return null;
     }
 
@@ -111,6 +121,9 @@ public class ConversionHelpers {
         if(o instanceof Short) {
             return TYPE_SHORT;
         }
+        if(o instanceof UUID) {
+            return TYPE_ADDRESS;
+        }
         if(o instanceof String) {
             try {
                 //noinspection ResultOfMethodCallIgnored
@@ -120,7 +133,15 @@ public class ConversionHelpers {
                 return TYPE_STRING;
             }
         }
+        if(o instanceof byte[]) {
+            return TYPE_BYTE_ARRAY;
+        }
         System.out.printf("[ocmips] Unsupported return type %s for ComponentCallHandler\n", o.getClass());
         return TYPE_NULL;
+    }
+
+    private static boolean isWordSize(int type) {
+        return type == TYPE_INTEGER || type == TYPE_FLOAT || type == TYPE_NULL ||
+                type == TYPE_SHORT || type == TYPE_BOOLEAN;
     }
 }

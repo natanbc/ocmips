@@ -37,6 +37,15 @@ public class MemoryUtils {
         return ByteBuffer.wrap(array);
     }
 
+    public static ByteBuffer wrap(byte[] array) {
+        if(isExactWordCount(array.length)) {
+            return wrapExact(array);
+        }
+        ByteBuffer b = allocateRounding(array.length);
+        b.put(array).position(0);
+        return b;
+    }
+
     public static boolean isExactWordCount(int bytes) {
         return (bytes & 0b11) == 0;
     }
@@ -65,5 +74,18 @@ public class MemoryUtils {
         }
         LongBuffer lb = buffer.asLongBuffer();
         return new UUID(lb.get(0), lb.get(1)).toString();
+    }
+
+    public static byte[] readByteArray(MipsCPU cpu, int address) throws MemoryOperationException {
+        if(address == 0) return null;
+        int len = cpu.readWord(address);
+        if(len > 2048) {
+            throw new MemoryOperationException(address, MemoryOperationException.Reason.INVALID_VALUE);
+        }
+        byte[] dest = new byte[len];
+        for(int i = 0; i < dest.length; i++) {
+            dest[i] = (byte)cpu.readByte(address + 4 + i);
+        }
+        return dest;
     }
 }
