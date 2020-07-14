@@ -19,23 +19,3 @@ volatile int* rt_get_eeprom_content(volatile eeprom_t* eeprom) {
 volatile int* rt_get_eeprom_data(volatile eeprom_t* eeprom) {
     return &eeprom->__internal[(eeprom->size / 4) - 1];
 }
-
-void rt_sync_framebuffer(volatile framebuffer_t* fb) {
-    fb->sync = 1;
-}
-
-void rt_clear_framebuffer(volatile framebuffer_t* fb) {
-    fb->sync = 2;
-}
-
-void rt_sync_drive(volatile drive_t* drive, int mode) {
-    drive->sync = mode;
-}
-
-void rt_sync_eeprom(volatile eeprom_t* eeprom, int mode) {
-    eeprom->sync = mode;
-}
-
-void rt_call_method(volatile component_method_t* method) {
-    method->call = 1;
-}
