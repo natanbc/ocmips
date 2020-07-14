@@ -1,6 +1,7 @@
 #pragma once
 
 #include "crt.h"
+#include "malloc.h"
 #include "rt/component.h"
 #include "rt/drive.h"
 #include "rt/eeprom.h"

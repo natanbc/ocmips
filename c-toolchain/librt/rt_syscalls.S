@@ -66,3 +66,17 @@ rt_dbg: .globl rt_dbg
     li $v0, 9
     syscall
     jr $ra
+
+# int rt_mremap(void* addr, void* target, int size);
+.section .text.rt_mremap
+rt_mremap: .globl rt_mremap
+    li $v0, 10
+    syscall
+    jr $ra
+
+# int rt_ramsize();
+.section .text.rt_ramsize
+    li $v0, 11
+    syscall
+    jr $ra
+

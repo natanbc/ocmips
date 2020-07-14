@@ -1,9 +1,7 @@
 #include "rt.h"
 
-static const int EEPROM_MAP_ADDR = 0x80000000
-                                   - __builtin_offsetof(eeprom_t, __internal)
-                                   + 4;
-MEMORY_MAP(eeprom_t,           eeprom, EEPROM_MAP_ADDR);
+#define EEPROM_POS (0x80000000 - offsetof(eeprom_t, __internal))
+MEMORY_MAP(eeprom_t,           eeprom, EEPROM_POS);
 MEMORY_MAP(component_method_t, method, 0x88000000); //only one may be active at a time
 MEMORY_MAP(framebuffer_t,      fb,     0x88000000); //only one may be active at a time
 
@@ -84,4 +82,5 @@ int main() {
         rt_bsod(can_render ? &gpu : 0, "ERR_EEPROM_MAP_FAIL");
     }
     ((void(*)())rt_get_eeprom_content(eeprom))();
+    rt_bsod(can_render ? &gpu : 0, "ERR_EEPROM_RETURNED");
 }

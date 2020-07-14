@@ -1,5 +1,7 @@
 #pragma once
 
+#include "stddef.h"
+
 typedef int address_t[4];
 
 #define MEMORY_MAP(_T,_N,_A) \
@@ -17,4 +19,8 @@ int rt_unmap(volatile void* addr);
 void rt_bsod(address_t* gpu, const char* msg);
 
 void rt_dbg(const char* msg, int type, int val);
+
+int rt_mremap(void* addr, void* target, int size);
+
+int rt_ramsize();
 
