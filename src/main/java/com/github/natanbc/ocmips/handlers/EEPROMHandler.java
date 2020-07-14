@@ -90,7 +90,7 @@ public class EEPROMHandler implements MemoryHandler {
         if(address == base + 12) {
             return dataSize;
         }
-        int offset = address - base - 12;
+        int offset = address - base - 16;
         if(offset < size) {
             return content(address).buffer.get(offset / 4);
         } else {
