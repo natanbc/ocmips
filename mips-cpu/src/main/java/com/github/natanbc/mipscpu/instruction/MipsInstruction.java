@@ -251,7 +251,7 @@ public class MipsInstruction {
             //beq
             case 0b000100: {
                 if(cpu.registers().readInteger(rs) == cpu.registers().readInteger(rt)) {
-                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                 }
                 return;
             }
@@ -261,7 +261,7 @@ public class MipsInstruction {
                     //bgez
                     case 0b00001: {
                         if(cpu.registers().readInteger(rs) >= 0) {
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                         }
                         return;
                     }
@@ -269,14 +269,14 @@ public class MipsInstruction {
                     case 0b10001: {
                         if(cpu.registers().readInteger(rs) >= 0) {
                             cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                         }
                         return;
                     }
                     //bltz
                     case 0b00000: {
                         if(cpu.registers().readInteger(rs) < 0) {
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                         }
                         return;
                     }
@@ -284,7 +284,7 @@ public class MipsInstruction {
                     case 0b10000: {
                         if(cpu.registers().readInteger(rs) < 0) {
                             cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                         }
                         return;
                     }
@@ -293,21 +293,21 @@ public class MipsInstruction {
                 //bgtz
             case 0b000111: {
                 if(cpu.registers().readInteger(rs) > 0) {
-                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                 }
                 return;
             }
             //blez
             case 0b000110: {
                 if(cpu.registers().readInteger(rs) <= 0) {
-                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                 }
                 return;
             }
             //bne
             case 0b000101: {
                 if(cpu.registers().readInteger(rs) != cpu.registers().readInteger(rt)) {
-                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + (signExtend(imm) << 2));
+                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
                 }
                 return;
             }
@@ -336,6 +336,34 @@ public class MipsInstruction {
                     throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
                 }
                 cpu.registers().writeInteger(rt, cpu.readWord(addr));
+                return;
+            }
+            //lwl
+            case 0b100010: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                int word = cpu.readWord(addr & ~0b11);
+                int register = cpu.registers().readInteger(rt);
+                switch (addr & 0b11) {
+                    case 0: register = word; break;
+                    case 1: register = ((word<< 8) & ~0x0000FF) | (register & 0x0000FF); break;
+                    case 2: register = ((word<<16) & ~0x00FFFF) | (register & 0x00FFFF); break;
+                    case 3: register = ((word<<24) & ~0xFFFFFF) | (register & 0xFFFFFF); break;
+                }
+                cpu.registers().writeInteger(rt, register);
+                return;
+            }
+            //lwr
+            case 0b100110: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                int word = cpu.readWord(addr & ~0b11);
+                int register = cpu.registers().readInteger(rt);
+                switch (addr & 0b11) {
+                    case 0: register = ((word>>>24) & 0x0000FF) | (register & ~0x0000FF); break;
+                    case 1: register = ((word>>>16) & 0x00FFFF) | (register & ~0x00FFFF); break;
+                    case 2: register = ((word>>> 8) & 0xFFFFFF) | (register & ~0xFFFFFF); break;
+                    case 3: register = word; break;
+                }
+                cpu.registers().writeInteger(rt, register);
                 return;
             }
             //ori
@@ -374,6 +402,34 @@ public class MipsInstruction {
                     throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
                 }
                 cpu.writeWord(addr, cpu.registers().readInteger(rt));
+                return;
+            }
+            //swl
+            case 0b101010: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                int word = cpu.readWord(addr & ~0b11);
+                int register = cpu.registers().readInteger(rt);
+                switch (addr & 0b11) {
+                    case 0: word = register; break;
+                    case 1: word = (word & 0xFF000000) | (register >>> 24); break;
+                    case 2: word = (word & 0xFFFF0000) | (register >>> 16); break;
+                    case 3: word = (word & 0xFFFFFF00) | (register >>>  8); break;
+                }
+                cpu.writeWord(addr & ~0b11, word);
+                return;
+            }
+            //swr
+            case 0b101110: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                int word = cpu.readWord(addr & ~0b11);
+                int register = cpu.registers().readInteger(rt);
+                switch (addr & 0b11) {
+                    case 0: word = ((register & 0x0000FF) << 24) | (word & 0xFFFFFF); break;
+                    case 1: word = ((register & 0x00FFFF) << 16) | (word & 0x00FFFF); break;
+                    case 2: word = ((register & 0xFFFFFF) <<  8) | (word & 0x0000FF); break;
+                    case 3: word = register; break;
+                }
+                cpu.writeWord(addr & ~0b11, word);
                 return;
             }
             //xori
