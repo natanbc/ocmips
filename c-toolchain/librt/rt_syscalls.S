@@ -27,7 +27,6 @@ rt_map_special_component: .globl rt_map_special_component
 rt_unmap: .globl rt_unmap
     li $v0, 4
     syscall
-    li $v0, 0
     jr $ra
 
 # int rt_map_component(volatile component_method_t* addr, address_t* address, const char* method, int max_args);
@@ -35,7 +34,6 @@ rt_unmap: .globl rt_unmap
 rt_map_component: .globl rt_map_component
     li $v0, 5
     syscall
-    li $v0, 0
     jr $ra
 
 # int rt_find_component(const char* type, int which, address_t* dest);
