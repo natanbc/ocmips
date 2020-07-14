@@ -7,6 +7,7 @@ void* memcpy(void* dest, const void* src, unsigned int n) {
         *d = *s;
         d++;
         s++;
+        n--;
     }
     return dest;
 }

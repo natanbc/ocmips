@@ -76,6 +76,7 @@ rt_mremap: .globl rt_mremap
 
 # int rt_ramsize();
 .section .text.rt_ramsize
+rt_ramsize: .globl rt_ramsize
     li $v0, 11
     syscall
     jr $ra
