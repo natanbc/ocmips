@@ -3,10 +3,13 @@ package com.github.natanbc.ocmips.utils;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class ConversionHelpers {
     public static final int
@@ -18,6 +21,27 @@ public class ConversionHelpers {
             TYPE_SHORT = 6,
             TYPE_BOOLEAN = 7,
             TYPE_BYTE_ARRAY = 8;
+    private static final Predicate<Object> IS_FILE_HANDLE;
+    private static final Function<Object, Integer> GET_HANDLE_VALUE;
+
+    static {
+        Predicate<Object> isHandle = __ -> false;
+        Function<Object, Integer> getValue = null;
+        try {
+            Class<?> c = Class.forName("li.cil.oc.server.component.HandleValue");
+            Method getter = c.getMethod("handle");
+            isHandle = c::isInstance;
+            getValue = handle -> {
+                try {
+                    return (Integer)getter.invoke(handle);
+                } catch (Exception e) {
+                    throw new AssertionError(e);
+                }
+            };
+        } catch (Exception ignored) {}
+        IS_FILE_HANDLE = isHandle;
+        GET_HANDLE_VALUE = getValue;
+    }
 
     // struct retval { word type, word value, word next }
     public static int writeObjectsToMemory(MipsCPU cpu, Object[] arr, int addr, int size) throws MemoryOperationException {
@@ -102,6 +126,9 @@ public class ConversionHelpers {
             return buffer.asIntBuffer()
                     .put(0, array.length);
         }
+        if(IS_FILE_HANDLE.test(value)) {
+            return MemoryUtils.allocateWords(1).put(GET_HANDLE_VALUE.apply(value));
+        }
         return null;
     }
 
@@ -135,6 +162,9 @@ public class ConversionHelpers {
         }
         if(o instanceof byte[]) {
             return TYPE_BYTE_ARRAY;
+        }
+        if(IS_FILE_HANDLE.test(o)) {
+            return TYPE_INTEGER;
         }
         System.out.printf("[ocmips] Unsupported return type %s for ComponentCallHandler\n", o.getClass());
         return TYPE_NULL;
