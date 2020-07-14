@@ -121,7 +121,7 @@ public class EEPROMHandler implements MemoryHandler {
             return;
         }
         dirty = true;
-        int offset = address - base - 12;
+        int offset = address - base - 16;
         if(offset < size) {
             content(address).buffer.put(offset / 4, value);
         } else {
