@@ -48,6 +48,9 @@ __start: .globl __start
     li $sp, RT_STACK_ADDR+RT_STACK_SIZE
     li $fp, 0
     li $gp, RT_GP
+#if defined(RT_ENABLE_MALLOC)
+    jal rt_malloc_init
+#endif
     jal main
     li $v0, 7
     li $a0, 0
