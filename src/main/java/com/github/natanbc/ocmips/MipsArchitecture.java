@@ -103,13 +103,13 @@ public class MipsArchitecture implements Architecture {
 
     @Override
     public ExecutionResult runThreaded(boolean isSynchronizedReturn) {
+        ExecutionResult r = queuedResult;
+        queuedResult = null;
+        if(r != null) return r;
         if(crashed) {
             return new ExecutionResult.Sleep(100);
         }
         updateRam();
-        ExecutionResult r = queuedResult;
-        queuedResult = null;
-        if(r != null) return r;
         try {
             for(int i = 0; i < MAX_STEPS_PER_CALL; i++) {
 //                int pc;
@@ -154,9 +154,17 @@ public class MipsArchitecture implements Architecture {
             crashed = tag.getBoolean("crashed");
             cpu = createCPU(tag.getIntArray("mips_boot_rom"));
             cpu.setRAM(tag.getIntArray("mips_ram"));
-            int[] regs = tag.getIntArray("mips_registers");
-            for(int i = 0; i < regs.length; i++) {
-                cpu.registers().writeInteger(i, regs[i]);
+            {
+                int[] regs = tag.getIntArray("mips_registers");
+                for(int i = 0; i < regs.length; i++) {
+                    cpu.registers().writeInteger(i, regs[i]);
+                }
+            }
+            {
+                int[] fpregs = tag.getIntArray("mips_fpregisters");
+                for(int i = 0; i < fpregs.length; i++) {
+                    cpu.registers().writeFloat(i, fpregs[i]);
+                }
             }
             HandlerSerialization.deserializeHandlers(machine, cpu, tag);
         }
@@ -169,9 +177,16 @@ public class MipsArchitecture implements Architecture {
             tag.setBoolean("crashed", crashed);
             tag.setIntArray("mips_boot_rom", OCMips.BOOTROM);
             tag.setIntArray("mips_ram", cpu.getRAM());
-            int[] regs = new int[MipsRegisters.INTEGER_COUNT];
-            for(int i = 0; i < regs.length; i++) regs[i] = cpu.registers().readInteger(i);
-            tag.setIntArray("mips_registers", regs);
+            {
+                int[] regs = new int[MipsRegisters.INTEGER_COUNT];
+                for(int i = 0; i < regs.length; i++) regs[i] = cpu.registers().readInteger(i);
+                tag.setIntArray("mips_registers", regs);
+            }
+            {
+                int[] fpregs = new int[MipsRegisters.FLOAT_COUNT];
+                for(int i = 0; i < fpregs.length; i++) fpregs[i] = cpu.registers().readFloat(i);
+                tag.setIntArray("mips_fpregisters", fpregs);
+            }
             try {
                 HandlerSerialization.serializeHandlers(cpu, tag);
             } catch (Throwable t) {
@@ -354,6 +369,8 @@ public class MipsArchitecture implements Architecture {
                         System.out.printf("[dbg] %s: %s\n", msg, MemoryUtils.readAddress(cpu, val));
                     } else if(type == ConversionHelpers.TYPE_BYTE_ARRAY) {
                         System.out.printf("[dbg] %s: %s\n", msg, java.util.Arrays.toString(MemoryUtils.readByteArray(cpu, val)));
+                    } else if(type == ConversionHelpers.TYPE_FLOAT) {
+                        System.out.printf("[dbg] %s: %f (0x%x)\n", msg, Float.intBitsToFloat(val), val);
                     } else {
                         System.out.printf("[dbg] %s: %d (0x%x)\n", msg, val, val);
                     }
