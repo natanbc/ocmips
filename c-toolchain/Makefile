@@ -34,7 +34,7 @@ override BASE_FLAGS += \
     -DRT_STACK_SIZE=${STACK_SIZE} -DRT_RAM_START=${RAM_START}       \
     -DRT_STACK_ADDR=${STACK_ADDR} 									\
     -target mips-none -march=mips2 -mno-madd4 -mno-msa -mno-mt      \
-    -mno-virt -mno-xgot -mno-dsp -mno-dspr2 -mabicalls -msoft-float \
+    -mno-virt -mno-xgot -mno-dsp -mno-dspr2 -mabicalls 				\
     -mllvm -disable-mips-delay-filler=true -mno-gpopt -mno-crc      \
     -nostdlib
 ifeq (${ENABLE_MALLOC},true)
