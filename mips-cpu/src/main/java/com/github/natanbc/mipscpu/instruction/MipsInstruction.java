@@ -338,6 +338,15 @@ public class MipsInstruction {
                 cpu.registers().writeInteger(rt, cpu.readWord(addr));
                 return;
             }
+            //lwc1
+            case 0b110001: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((addr & ~0b11) != addr) {
+                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
+                }
+                cpu.registers().writeFloat(rt, cpu.readWord(addr));
+                return;
+            }
             //lwl
             case 0b100010: {
                 int addr = cpu.registers().readInteger(rs) + signExtend(imm);
@@ -404,6 +413,15 @@ public class MipsInstruction {
                 cpu.writeWord(addr, cpu.registers().readInteger(rt));
                 return;
             }
+            //swc1
+            case 0b111001: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((addr & ~0b11) != addr) {
+                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                }
+                cpu.writeWord(addr, cpu.registers().readFloat(rt));
+                return;
+            }
             //swl
             case 0b101010: {
                 int addr = cpu.registers().readInteger(rs) + signExtend(imm);
@@ -437,7 +455,174 @@ public class MipsInstruction {
                 cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) ^ imm);
                 return;
             }
+            //COP1
+            case 0b010001: {
+                executeCOP1(cpu, instruction);
+                return;
+            }
             default: throw new IllegalInstructionException(instruction, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
+        }
+    }
+
+    //i fear no man
+    //but that thing
+    //it scares me
+    private static void executeCOP1(MipsCPU cpu, int instruction) throws MipsException {
+        //https://github.com/iamgreaser/ocmips/blob/4f9c3443c2195b41252845d420ed461807add0df/src/main/java/potato/chocolate/mods/ebola/arch/mips/Jipsy.java#L1216
+        int rs = (instruction>>>21)&0x1F;
+        int rt = (instruction>>>16)&0x1F;
+        int ft = rt;
+        int rd = (instruction>>>11)&0x1F;
+        int fs = rd;
+        int fd = (instruction>>>6)&0x1F;
+        int otyp1 = (instruction)&0x3F;
+        if(rs >= 16) {
+            switch (rs) {
+                //SP
+                case 16: {
+                    float vs1 = Float.intBitsToFloat(cpu.registers().readFloat(fs));
+                    float vs2 = Float.intBitsToFloat(cpu.registers().readFloat(ft));
+                    float vd = 0.0f;
+                    switch (otyp1) {
+                        // ADD
+                        case 0: vd = vs1 + vs2; break;
+                        // SUB
+                        case 1: vd = vs1 - vs2; break;
+                        // MUL
+                        case 2: vd = vs1 * vs2; break;
+                        // DIV
+                        case 3: vd = vs1 / vs2; break;
+                        // ABS
+                        case 5:  vd = Math.abs(vs1); break;
+                        // MOV
+                        case 6: vd = vs1; break;
+                        // NEG
+                        case 7: vd = -vs1; break;
+                        // CVT from S to D
+                        case 33: {
+                            long vdi = Double.doubleToLongBits(vs1);
+                            fd &= ~1;
+                            cpu.registers().writeFloat(fd, (int)(vdi));
+                            cpu.registers().writeFloat(fd + 1, (int)(vdi>>>32));
+                            fd = -1;
+                            break;
+                        }
+                        // CVT from S to W
+                        case 36: {
+                            cpu.registers().writeFloat(fd, (int)vs1);
+                            fd = -1;
+                            break;
+                        }
+                        default: throw new IllegalInstructionException(instruction, "Unimplemented SP COP1");
+                    }
+                    if(fd != -1) {
+                        cpu.registers().writeFloat(fd, Float.floatToIntBits(vd));
+                    }
+                    break;
+                }
+                //DP
+                case 17: {
+                    fs &= ~1; ft &= ~1;
+                    double vs1 = Double.longBitsToDouble(
+                            (((long)cpu.registers().readFloat(fs))&0xFFFFFFFFL)
+                                    |((((long)cpu.registers().readFloat(fs+1))&0xFFFFFFFFL)<<32L)
+                    );
+                    double vs2 = Double.longBitsToDouble(
+                            (((long)cpu.registers().readFloat(ft))&0xFFFFFFFFL)
+                                    |((((long)cpu.registers().readFloat(ft+1))&0xFFFFFFFFL)<<32L)
+                    );
+                    double vd = 0;
+                    switch (otyp1) {
+                        // ADD
+                        case 0: vd = vs1 + vs2; break;
+                        // SUB
+                        case 1: vd = vs1 - vs2; break;
+                        // MUL
+                        case 2: vd = vs1 * vs2; break;
+                        // DIV
+                        case 3: vd = vs1 / vs2; break;
+                        // ABS
+                        case 5: vd = Math.abs(vs1); break;
+                        // MOV
+                        case 6: vd = vs1; break;
+                        // NEG
+                        case 7: vd = -vs1; break;
+                        // CVT from D to S
+                        case 32: {
+                            cpu.registers().writeFloat(fd, Float.floatToIntBits((float)vs1));
+                            fd = -1;
+                            break;
+                        }
+                        // CVT from D to W
+                        case 36: {
+                            cpu.registers().writeFloat(fd, (int)vs1);
+                            fd = -1;
+                            break;
+                        }
+                        default: throw new IllegalInstructionException(instruction, "Unimplemented DP COP1");
+                    }
+                    if (fd != -1) {
+                        long vdi = Double.doubleToLongBits(vd);
+                        fd &= ~1;
+                        cpu.registers().writeFloat(fd, (int)(vdi));
+                        cpu.registers().writeFloat(fd+1, (int)(vdi>>>32));
+                    }
+                    break;
+                }
+                // W
+                case 20: {
+                    switch (otyp1) {
+                        // CVT from W to S
+                        case 32: {
+                            cpu.registers().writeFloat(fd, Float.floatToIntBits(cpu.registers().readFloat(fs)));
+                            break;
+                        }
+                        // CVT from W to D
+                        case 33: {
+                            long vdi = Double.doubleToLongBits(cpu.registers().readFloat(fs));
+                            fd &= ~1;
+                            cpu.registers().writeFloat(fd, (int)(vdi));
+                            cpu.registers().writeFloat(fd+1, (int)(vdi>>>32));
+                            break;
+                        }
+                        default: throw new IllegalInstructionException(instruction, "Unimplemented W COP1");
+                    }
+                    break;
+                }
+                default: throw new IllegalInstructionException(instruction, "Unknown COP1 size");
+            }
+        } else {
+            switch (rs) {
+                // MFCn
+                case 0: {
+                    cpu.registers().writeInteger(rt, cpu.registers().readFloat(rd));
+                    break;
+                }
+                // CFCn
+                case 2: {
+                    int tmp;
+                    // FCR0: Revision
+                    if (rd == 0) {
+                        tmp = 0x0300;
+                    } else {
+                        throw new IllegalInstructionException(instruction, "Unimplemented COP1 CFCn");
+                    }
+                    cpu.registers().writeInteger(rt, tmp);
+                    break;
+                }
+                // MTCn
+                case 4: {
+                    cpu.registers().writeFloat(fs, cpu.registers().readInteger(rt));
+                    break;
+                }
+                // CTCn
+                case 6: {
+                    throw new IllegalInstructionException(instruction, "Unimplemented COP1 CTCn");
+                }
+                default: {
+                    throw new IllegalInstructionException(instruction, "Unimplemented COP1");
+                }
+            }
         }
     }
 
@@ -503,13 +688,96 @@ public class MipsInstruction {
             case 0b100100: return "lbu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001111: return "lui " + ir(rt) + ", " + imm;
             case 0b100011: return "lw " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b110001: return "lwc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b100010: return "lwl " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b100110: return "lwr " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001101: return "ori " + iregs(rt, rs) + ", " + imm;
             case 0b101000: return "sb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001010: return "slti " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b001011: return "sltiu " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b101011: return "sw " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b111001: return "swc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b101010: return "swl " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b101110: return "swr " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001110: return "xori " + iregs(rt, rs) + ", " + imm;
+            case 0b010001: return toStringCOP1(instruction);
             default: return invalid(instruction, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
+        }
+    }
+
+    private static String toStringCOP1(int instruction) {
+        int rs = (instruction>>>21)&0x1F;
+        int rt = (instruction>>>16)&0x1F;
+        @SuppressWarnings("UnnecessaryLocalVariable") int ft = rt;
+        int rd = (instruction>>>11)&0x1F;
+        @SuppressWarnings("UnnecessaryLocalVariable") int fs = rd;
+        int fd = (instruction>>>6)&0x1F;
+        int otyp1 = (instruction)&0x3F;
+        if(rs >= 16) {
+            switch (rs) {
+                //SP
+                case 16: {
+                    switch (otyp1) {
+                        case 0: return "add.s " + fregs(fd, fs, ft);
+                        case 1: return "sub.s " + fregs(fd, fs, ft);
+                        case 2: return "mul.s " + fregs(fd, fs, ft);
+                        case 3: return "div.s " + fregs(fd, fs, ft);
+                        case 5: return "abs.s " + fregs(fd, fs);
+                        case 6: return "mov.s " + fregs(fd, fs);
+                        case 7: return "neg.s " + fregs(fd, fs);
+                        case 33: return "cvt.d.s " + fregs(fd & ~1, fs);
+                        case 36: return "cvt.w.s " + fregs(fd, fs);
+                        default: return invalid(instruction, "Unimplemented SP COP1");
+                    }
+                }
+                //DP
+                case 17: {
+                    switch (otyp1) {
+                        case 0: return "add.d " + fregs(fd, fs, ft);
+                        case 1: return "sub.d " + fregs(fd, fs, ft);
+                        case 2: return "mul.d " + fregs(fd, fs, ft);
+                        case 3: return "div.d " + fregs(fd, fs, ft);
+                        case 5: return "abs.d " + fregs(fd, fs);
+                        case 6: return "mov.d " + fregs(fd, fs);
+                        case 7: return "neg.d " + fregs(fd, fs);
+                        case 32: return "cvt.s.d " + fregs(fd, fs);
+                        case 36: return "cvt.w.d " + fregs(fd, fs);
+                        default: return invalid(instruction, "Unimplemented DP COP1");
+                    }
+                }
+                // W
+                case 20: {
+                    switch (otyp1) {
+                        case 32: return "cvt.s.w " + fregs(fd, fs);
+                        case 33: return "cvt.d.w " + fregs(fd, fs);
+                        default: return invalid(instruction, "Unimplemented W COP1");
+                    }
+                }
+                default: return invalid(instruction, "Unknown COP1 size");
+            }
+        } else {
+            switch (rs) {
+                // MFCn
+                case 0: return "mfc1 " + ir(rt) + ", " + fr(fs);
+                // CFCn
+                case 2: {
+                    // FCR0: Revision
+                    if (rd == 0) {
+                        return "cfc1 " + ir(rt) + ", FIR";
+                    } else {
+                        return invalid(instruction, "Unimplemented COP1 CFCn");
+                    }
+                }
+                // MTCn
+                case 4: return "mtc1 " + fr(fs) + ", " + ir(rt);
+                // CTCn
+                case 6: {
+                    return invalid(instruction, "Unimplemented COP1 CTCn");
+                }
+                default: {
+                    return invalid(instruction, "Unimplemented COP1");
+                }
+            }
         }
     }
 
@@ -527,6 +795,17 @@ public class MipsInstruction {
 
     //*i*nteger *r*egister
     private static String ir(int r) { return MipsRegisters.integerName(r); }
+
+    private static String fregs(int a, int b, int c) {
+        return String.join(", ", fr(a), fr(b), fr(c));
+    }
+
+    private static String fregs(int a, int b) {
+        return String.join(", ", fr(a), fr(b));
+    }
+
+    //*f*loat *r*egister
+    private static String fr(int r) { return MipsRegisters.floatName(r); }
 
     private static int signExtend(int imm) {
         return (short)imm;

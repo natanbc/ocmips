@@ -51,7 +51,7 @@ public class MipsRegisters {
     public static final int FLAG_PC_WRITTEN = 0x01;
 
     private final int[] integerRegisters = new int[INTEGER_COUNT];
-    private final float[] fpRegisters = new float[FLOAT_COUNT];
+    private final int[] fpRegisters = new int[FLOAT_COUNT];
     private int flags = 0;
 
     public void clearFlags() {
@@ -75,11 +75,11 @@ public class MipsRegisters {
         integerRegisters[register] = value;
     }
 
-    public float readFloat(int register) {
+    public int readFloat(int register) {
         return fpRegisters[register];
     }
 
-    public void writeFloat(int register, float value) {
+    public void writeFloat(int register, int value) {
         fpRegisters[register] = value;
     }
 
