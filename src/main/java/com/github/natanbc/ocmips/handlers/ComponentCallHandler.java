@@ -3,8 +3,10 @@ package com.github.natanbc.ocmips.handlers;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
+import com.github.natanbc.ocmips.RetryInNextTick;
 import com.github.natanbc.ocmips.utils.ConversionHelpers;
 import com.github.natanbc.ocmips.utils.MemoryUtils;
+import li.cil.oc.api.machine.LimitReachedException;
 import li.cil.oc.api.machine.Machine;
 import net.minecraft.nbt.NBTTagCompound;
 
@@ -91,6 +93,8 @@ public class ComponentCallHandler implements MemoryHandler {
             Object[] ret;
             try {
                 ret = machine.invoke(componentAddress, method, args);
+            } catch (LimitReachedException e) {
+                throw new RetryInNextTick(e);
             } catch(Exception e) {
                 e.printStackTrace();
                 throw new MemoryOperationException(address, MemoryOperationException.Reason.ACCESS_ERROR);
