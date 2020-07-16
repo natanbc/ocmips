@@ -13,6 +13,7 @@ endef
 override AR :=      $(call override_default,AR,llvm-ar-10)
 override AS :=      $(call override_default,AS,clang-10)
 override CC :=      $(call override_default,CC,clang-10)
+override CXX :=     $(call override_default,CXX,clang++-10)
 override LD :=      $(call override_default,LD,ld.lld-10)
 override LLC :=     $(call override_default,LLC,llc-10)
 override OBJCOPY := $(call override_default,OBJCOPY,llvm-objcopy-10)
@@ -66,10 +67,12 @@ ifdef PROJECT
   ifeq (${ENABLE_MALLOC},true)
     override BASE_FLAGS += -DRT_ENABLE_MALLOC
   endif
-  override CFLAGS += \
-      ${BASE_FLAGS} -fdata-sections -ffunction-sections -Ilibrt
   override ASMFLAGS += \
   	${BASE_FLAGS} -DRT_GP=0
+  override CFLAGS += \
+      ${BASE_FLAGS} -fdata-sections -ffunction-sections -Ilibrt
+  override CXXFLAGS += \
+	  ${CFLAGS}
   override LDFLAGS += \
       --image-base=${BASE} --section-start=.text=${BASE} --gc-sections \
       --script ${LD_SCRIPT} --defsym=BASE_ADDR=${BASE}
@@ -95,7 +98,7 @@ build: ${RESULT}
 
   override BASE_FLAGS += -I ${INCLUDE_PATH}
 
-  SOURCE_FILES=$(notdir $(wildcard ${SRC_PATH}*.c ${SRC_PATH}*.S ${SRC_PATH}*.rs))
+  SOURCE_FILES=$(notdir $(wildcard ${SRC_PATH}*.c ${SRC_PATH}*.S ${SRC_PATH}*.rs ${SRC_PATH}*.cpp))
 
   OBJ_FILES=$(SOURCE_FILES:=.o)
   OBJ_PATHS=$(addprefix ${BIN_PATH}, $(OBJ_FILES))
@@ -109,6 +112,8 @@ $(BIN_PATH)%.rs.o: $(BIN_PATH)%.rs.bc
 	$(LLC) $(LLCFLAGS) -filetype=obj -o $@ $<
 $(BIN_PATH)%.rs.bc: $(SRC_PATH)%.rs
 	$(RUSTC) $(RUSTCFLAGS) -o $@ $<
+$(BIN_PATH)%.cpp.o: $(SRC_PATH)%.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 setup:
 	mkdir -p $(BIN_PATH)
