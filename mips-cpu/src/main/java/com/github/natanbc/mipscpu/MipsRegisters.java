@@ -34,8 +34,9 @@ public class MipsRegisters {
             F16 = 16, F17 = 17, F18 = 18, F19 = 19,
             F20 = 20, F21 = 21, F22 = 22, F23 = 23,
             F24 = 24, F25 = 25, F26 = 26, F27 = 27,
-            F28 = 28, F29 = 29, F30 = 30, F31 = 31;
-    public static final int FLOAT_COUNT = 32;
+            F28 = 28, F29 = 29, F30 = 30, F31 = 31,
+            FP_CC = 32;
+    public static final int FLOAT_COUNT = 33;
     private static final String[] FLOAT_NAMES = {
             "$f0",  "$f1",  "$f2",  "$f3",
             "$f4",  "$f5",  "$f6",  "$f7",
@@ -45,6 +46,7 @@ public class MipsRegisters {
             "$f20", "$f21", "$f22", "$f23",
             "$f24", "$f25", "$f26", "$f27",
             "$f28", "$f29", "$f30", "$f31",
+            "<fp_cc>"
     };
 
     // used by interpreter to detect writes to $pc
@@ -81,6 +83,18 @@ public class MipsRegisters {
 
     public void writeFloat(int register, int value) {
         fpRegisters[register] = value;
+    }
+
+    public boolean readFloatCondition(int cc) {
+        return ((fpRegisters[FP_CC] >> cc) & 0b1) == 0b1;
+    }
+
+    public void writeFloatCondition(int cc, boolean value) {
+        int v = fpRegisters[FP_CC];
+        //change nth bit to x
+        //number ^= (-x ^ number) & (1UL << n);
+        v ^= (-(value ? 1 : 0) ^ v) & (1 << cc);
+        fpRegisters[FP_CC] = v;
     }
 
     public static String integerName(int reg) {

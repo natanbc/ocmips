@@ -482,41 +482,89 @@ public class MipsInstruction {
                 case 16: {
                     float vs1 = Float.intBitsToFloat(cpu.registers().readFloat(fs));
                     float vs2 = Float.intBitsToFloat(cpu.registers().readFloat(ft));
-                    float vd = 0.0f;
-                    switch (otyp1) {
-                        // ADD
-                        case 0: vd = vs1 + vs2; break;
-                        // SUB
-                        case 1: vd = vs1 - vs2; break;
-                        // MUL
-                        case 2: vd = vs1 * vs2; break;
-                        // DIV
-                        case 3: vd = vs1 / vs2; break;
-                        // ABS
-                        case 5:  vd = Math.abs(vs1); break;
-                        // MOV
-                        case 6: vd = vs1; break;
-                        // NEG
-                        case 7: vd = -vs1; break;
-                        // CVT from S to D
-                        case 33: {
-                            long vdi = Double.doubleToLongBits(vs1);
-                            fd &= ~1;
-                            cpu.registers().writeFloat(fd, (int)(vdi));
-                            cpu.registers().writeFloat(fd + 1, (int)(vdi>>>32));
-                            fd = -1;
-                            break;
+                    //c.<cond>.s
+                    if((otyp1 & 0b110000) == 0b110000) {
+                        int cc = (instruction>>8)&0b111;
+                        int cond = otyp1 & 0b1111;
+                        /*
+                        In the cond field of the instruction: cond2..1 specify the nature of the
+                        comparison (equals, less than, and so on). cond0 specifies whether the
+                        comparison is ordered or unordered, that is, false or true if any operand
+                        is a NaN; cond3 indicates whether the instruction should signal an exception
+                        on QNaN inputs, or not (see Table 3.2).
+                         */
+                        boolean trapQNaN = (cond & 0b1000) == 0b1000;
+                        boolean unorderedCompare = (cond & 0b1) == 0b1;
+                        boolean unordered = Float.isNaN(vs1) | Float.isNaN(vs2);
+                        if(trapQNaN & unordered) {
+                            throw new TrapException(instruction, 1);
                         }
-                        // CVT from S to W
-                        case 36: {
-                            cpu.registers().writeFloat(fd, (int)vs1);
-                            fd = -1;
-                            break;
+                        boolean a;
+                        switch ((cond & 0b110) >> 1) {
+                            // F   / SF
+                            // UN  / NGLE
+                            case 0: {
+                                a = false;
+                                break;
+                            }
+                            // EQ  / SEQ
+                            // UEQ / NGL
+                            case 1: {
+                                a = vs1 == vs2;
+                                break;
+                            }
+                            // OLT / LT
+                            // ULT / NGE
+                            case 2: {
+                                a = vs1 < vs2;
+                                break;
+                            }
+                            // OLE / LE
+                            // ULE / NGT
+                            case 3: {
+                                a = vs1 <= vs2;
+                                break;
+                            }
+                            default: throw new AssertionError();
                         }
-                        default: throw new IllegalInstructionException(instruction, "Unimplemented SP COP1");
-                    }
-                    if(fd != -1) {
-                        cpu.registers().writeFloat(fd, Float.floatToIntBits(vd));
+                        cpu.registers().writeFloatCondition(cc, a | (unorderedCompare & unordered));
+                    } else {
+                        float vd = 0.0f;
+                        switch (otyp1) {
+                            // ADD
+                            case 0: vd = vs1 + vs2; break;
+                            // SUB
+                            case 1: vd = vs1 - vs2; break;
+                            // MUL
+                            case 2: vd = vs1 * vs2; break;
+                            // DIV
+                            case 3: vd = vs1 / vs2; break;
+                            // ABS
+                            case 5:  vd = Math.abs(vs1); break;
+                            // MOV
+                            case 6: vd = vs1; break;
+                            // NEG
+                            case 7: vd = -vs1; break;
+                            // CVT from S to D
+                            case 33: {
+                                long vdi = Double.doubleToLongBits(vs1);
+                                fd &= ~1;
+                                cpu.registers().writeFloat(fd, (int)(vdi));
+                                cpu.registers().writeFloat(fd + 1, (int)(vdi>>>32));
+                                fd = -1;
+                                break;
+                            }
+                            // CVT from S to W
+                            case 36: {
+                                cpu.registers().writeFloat(fd, (int)vs1);
+                                fd = -1;
+                                break;
+                            }
+                            default: throw new IllegalInstructionException(instruction, "Unimplemented SP COP1");
+                        }
+                        if(fd != -1) {
+                            cpu.registers().writeFloat(fd, Float.floatToIntBits(vd));
+                        }
                     }
                     break;
                 }
@@ -531,41 +579,89 @@ public class MipsInstruction {
                             (((long)cpu.registers().readFloat(ft))&0xFFFFFFFFL)
                                     |((((long)cpu.registers().readFloat(ft+1))&0xFFFFFFFFL)<<32L)
                     );
-                    double vd = 0;
-                    switch (otyp1) {
-                        // ADD
-                        case 0: vd = vs1 + vs2; break;
-                        // SUB
-                        case 1: vd = vs1 - vs2; break;
-                        // MUL
-                        case 2: vd = vs1 * vs2; break;
-                        // DIV
-                        case 3: vd = vs1 / vs2; break;
-                        // ABS
-                        case 5: vd = Math.abs(vs1); break;
-                        // MOV
-                        case 6: vd = vs1; break;
-                        // NEG
-                        case 7: vd = -vs1; break;
-                        // CVT from D to S
-                        case 32: {
-                            cpu.registers().writeFloat(fd, Float.floatToIntBits((float)vs1));
-                            fd = -1;
-                            break;
+                    //c.<cond>.d
+                    if((otyp1 & 0b110000) == 0b110000) {
+                        int cc = (instruction>>8)&0b111;
+                        int cond = otyp1 & 0b1111;
+                        /*
+                        In the cond field of the instruction: cond2..1 specify the nature of the
+                        comparison (equals, less than, and so on). cond0 specifies whether the
+                        comparison is ordered or unordered, that is, false or true if any operand
+                        is a NaN; cond3 indicates whether the instruction should signal an exception
+                        on QNaN inputs, or not (see Table 3.2).
+                         */
+                        boolean trapQNaN = (cond & 0b1000) == 0b1000;
+                        boolean unorderedCompare = (cond & 0b1) == 0b1;
+                        boolean unordered = Double.isNaN(vs1) | Double.isNaN(vs2);
+                        if(trapQNaN & unordered) {
+                            throw new TrapException(instruction, 1);
                         }
-                        // CVT from D to W
-                        case 36: {
-                            cpu.registers().writeFloat(fd, (int)vs1);
-                            fd = -1;
-                            break;
+                        boolean a;
+                        switch ((cond & 0b110) >> 1) {
+                            // F   / SF
+                            // UN  / NGLE
+                            case 0: {
+                                a = false;
+                                break;
+                            }
+                            // EQ  / SEQ
+                            // UEQ / NGL
+                            case 1: {
+                                a = vs1 == vs2;
+                                break;
+                            }
+                            // OLT / LT
+                            // ULT / NGE
+                            case 2: {
+                                a = vs1 < vs2;
+                                break;
+                            }
+                            // OLE / LE
+                            // ULE / NGT
+                            case 3: {
+                                a = vs1 <= vs2;
+                                break;
+                            }
+                            default: throw new AssertionError();
                         }
-                        default: throw new IllegalInstructionException(instruction, "Unimplemented DP COP1");
-                    }
-                    if (fd != -1) {
-                        long vdi = Double.doubleToLongBits(vd);
-                        fd &= ~1;
-                        cpu.registers().writeFloat(fd, (int)(vdi));
-                        cpu.registers().writeFloat(fd+1, (int)(vdi>>>32));
+                        cpu.registers().writeFloatCondition(cc, a | (unorderedCompare & unordered));
+                    } else {
+                        double vd = 0;
+                        switch (otyp1) {
+                            // ADD
+                            case 0: vd = vs1 + vs2; break;
+                            // SUB
+                            case 1: vd = vs1 - vs2; break;
+                            // MUL
+                            case 2: vd = vs1 * vs2; break;
+                            // DIV
+                            case 3: vd = vs1 / vs2; break;
+                            // ABS
+                            case 5: vd = Math.abs(vs1); break;
+                            // MOV
+                            case 6: vd = vs1; break;
+                            // NEG
+                            case 7: vd = -vs1; break;
+                            // CVT from D to S
+                            case 32: {
+                                cpu.registers().writeFloat(fd, Float.floatToIntBits((float)vs1));
+                                fd = -1;
+                                break;
+                            }
+                            // CVT from D to W
+                            case 36: {
+                                cpu.registers().writeFloat(fd, (int)vs1);
+                                fd = -1;
+                                break;
+                            }
+                            default: throw new IllegalInstructionException(instruction, "Unimplemented DP COP1");
+                        }
+                        if (fd != -1) {
+                            long vdi = Double.doubleToLongBits(vd);
+                            fd &= ~1;
+                            cpu.registers().writeFloat(fd, (int)(vdi));
+                            cpu.registers().writeFloat(fd+1, (int)(vdi>>>32));
+                        }
                     }
                     break;
                 }
@@ -593,13 +689,13 @@ public class MipsInstruction {
             }
         } else {
             switch (rs) {
-                // MFCn
-                case 0: {
+                // MFC1
+                case 0b00000: {
                     cpu.registers().writeInteger(rt, cpu.registers().readFloat(rd));
                     break;
                 }
-                // CFCn
-                case 2: {
+                // CFC1
+                case 0b00010: {
                     int tmp;
                     // FCR0: Revision
                     if (rd == 0) {
@@ -610,14 +706,24 @@ public class MipsInstruction {
                     cpu.registers().writeInteger(rt, tmp);
                     break;
                 }
-                // MTCn
-                case 4: {
+                // MTC1
+                case 0b00100: {
                     cpu.registers().writeFloat(fs, cpu.registers().readInteger(rt));
                     break;
                 }
-                // CTCn
-                case 6: {
+                // CTC1
+                case 0b00110: {
                     throw new IllegalInstructionException(instruction, "Unimplemented COP1 CTCn");
+                }
+                // BC1F / BC1T
+                case 0b01000: {
+                    int cc = (instruction >>> 18) & 0b111;
+                    int offset = instruction & 0xFFFF;
+                    boolean tf = ((instruction >>> 16) & 0b1) == 0b1;
+                    if(cpu.registers().readFloatCondition(cc) == tf) {
+                        cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (offset << 2));
+                    }
+                    break;
                 }
                 default: {
                     throw new IllegalInstructionException(instruction, "Unimplemented COP1");
