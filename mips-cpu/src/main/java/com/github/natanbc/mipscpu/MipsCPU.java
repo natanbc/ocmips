@@ -79,6 +79,12 @@ public class MipsCPU {
         return (word >> shift) & 0xFF;
     }
 
+    public int readHalfWord(int address) throws MemoryOperationException {
+        int word = readWord(address & ~0b10);
+        int shift = 16 * (((address>>>1)&1)^1);
+        return (word >> shift) & 0xFFFF;
+    }
+
     public int readWord(int address) throws MemoryOperationException {
         MemoryHandler handler = handlerFor(address);
         if(handler != null) {
@@ -99,6 +105,15 @@ public class MipsCPU {
         int shift = 24 - ((address & BYTE_MASK) << 3);
         word &= ~(0xFF<<shift);
         word |= ((value&0xFF)<<shift);
+        writeWord(wordAddress, word);
+    }
+
+    public void writeHalfWord(int address, int value) throws MemoryOperationException {
+        int wordAddress = address & WORD_MASK;
+        int word = readWord(wordAddress);
+        int shift = 16 * (((address>>>1)&1)^1);
+        word &= ~(0xFFFF<<shift);
+        word |= ((value&0xFFFF)<<shift);
         writeWord(wordAddress, word);
     }
 

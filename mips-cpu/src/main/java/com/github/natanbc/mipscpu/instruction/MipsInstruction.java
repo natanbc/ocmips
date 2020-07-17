@@ -71,6 +71,10 @@ public class MipsInstruction {
                         cpu.registers().readInteger(rs) & cpu.registers().readInteger(rt));
                 return;
             }
+            //break
+            case 0b001101: {
+                throw new TrapException(instruction, 1);
+            }
             //div
             case 0b011010: {
                 int a = cpu.registers().readInteger(rs);
@@ -109,6 +113,16 @@ public class MipsInstruction {
                 cpu.registers().writeInteger(rd, cpu.registers().readInteger(LO));
                 return;
             }
+            //mthi
+            case 0b010001: {
+                cpu.registers().writeInteger(HI, cpu.registers().readInteger(rs));
+                return;
+            }
+            //mtlo
+            case 0b010011: {
+                cpu.registers().writeInteger(LO, cpu.registers().readInteger(rs));
+                return;
+            }
             //mult
             case 0b011000: {
                 cpu.registers().writeInteger(LO,
@@ -120,6 +134,13 @@ public class MipsInstruction {
             case 0b011001: {
                 cpu.registers().writeInteger(LO,
                         cpu.registers().readInteger(rs) * cpu.registers().readInteger(rt));
+                return;
+            }
+            //nor
+            case 0b100111: {
+                int s = cpu.registers().readInteger(rs);
+                int t = cpu.registers().readInteger(rt);
+                cpu.registers().writeInteger(rd, ~(s | t));
                 return;
             }
             //or
@@ -290,7 +311,7 @@ public class MipsInstruction {
                     }
                     default: throw new IllegalInstructionException(instruction, "Unknown branch type " + Integer.toBinaryString(rt));
                 }
-                //bgtz
+            //bgtz
             case 0b000111: {
                 if(cpu.registers().readInteger(rs) > 0) {
                     cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
@@ -322,6 +343,19 @@ public class MipsInstruction {
             case 0b100100: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
                 cpu.registers().writeInteger(rt, cpu.readByte(address) & 0xFF);
+                return;
+            }
+            //lh
+            case 0b100001: {
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                //cast to short to sign-extend
+                cpu.registers().writeInteger(rt, (short)cpu.readHalfWord(address));
+                return;
+            }
+            //lhu
+            case 0b100101: {
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                cpu.registers().writeInteger(rt, cpu.readHalfWord(address) & 0xFFFF);
                 return;
             }
             //lui
@@ -384,6 +418,12 @@ public class MipsInstruction {
             case 0b101000: {
                 cpu.writeByte(cpu.registers().readInteger(rs) + signExtend(imm),
                         0xFF & cpu.registers().readInteger(rt));
+                return;
+            }
+            //sh
+            case 0b101001: {
+                cpu.writeHalfWord(cpu.registers().readInteger(rs) + signExtend(imm),
+                        0xFFFF & cpu.registers().readInteger(rt));
                 return;
             }
             //slti
@@ -742,14 +782,18 @@ public class MipsInstruction {
             case 0b100000: return "add " + iregs(rd, rs, rt);
             case 0b100001: return "addu " + iregs(rd, rs, rt);
             case 0b100100: return "and " + iregs(rd, rs, rt);
+            case 0b001101: return "break";
             case 0b011010: return "div " + iregs(rs, rt);
             case 0b011011: return "divu " + iregs(rs, rt);
             case 0b001001: return "jalr " + iregs(rs, rd);
             case 0b001000: return "jr " + ir(rs);
             case 0b010000: return "mfhi " + ir(rd);
             case 0b010010: return "mflo " + ir(rd);
+            case 0b010001: return "mthi " + ir(rs);
+            case 0b010011: return "mtlo " + ir(rs);
             case 0b011000: return "mult " + iregs(rs, rt);
             case 0b011001: return "multu " + iregs(rs, rt);
+            case 0b100111: return "nor " + iregs(rd, rs, rt);
             case 0b100101: return "or " + iregs(rd, rs, rt);
             case 0b000000: return "sll " + iregs(rd, rt) + ", " + shamt;
             case 0b000100: return "sllv " + iregs(rd, rs, rt);
@@ -792,6 +836,8 @@ public class MipsInstruction {
             case 0b000101: return "bne " + iregs(rs, rt) + ", " + signExtend(imm);
             case 0b100000: return "lb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100100: return "lbu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b100001: return "lh " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b100101: return "lhu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001111: return "lui " + ir(rt) + ", " + imm;
             case 0b100011: return "lw " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b110001: return "lwc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
@@ -799,6 +845,7 @@ public class MipsInstruction {
             case 0b100110: return "lwr " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001101: return "ori " + iregs(rt, rs) + ", " + imm;
             case 0b101000: return "sb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b101001: return "sh " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001010: return "slti " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b001011: return "sltiu " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b101011: return "sw " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
