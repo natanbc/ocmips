@@ -134,7 +134,7 @@ public class MipsCPU {
     }
 
     public MemoryHandler handlerFor(int address) {
-        SortedMap<Integer, MemoryHandler> map = memoryHandlers.headMap(address+1);
+        SortedMap<Integer, MemoryHandler> map = memoryHandlers.headMap(address, true);
         if(map.isEmpty()) {
             return null;
         }
