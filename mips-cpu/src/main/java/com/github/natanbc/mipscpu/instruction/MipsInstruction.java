@@ -345,9 +345,23 @@ public class MipsInstruction {
                 cpu.registers().writeInteger(rt, cpu.readByte(address) & 0xFF);
                 return;
             }
+            //ldc1
+            case 0b110101: {
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b111) != address) {
+                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(address));
+                }
+                rt &= ~1;
+                cpu.registers().writeFloat(rt, cpu.readWord(address));
+                cpu.registers().writeFloat(rt+1, cpu.readWord(address+4));
+                return;
+            }
             //lh
             case 0b100001: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b1) != address) {
+                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(address));
+                }
                 //cast to short to sign-extend
                 cpu.registers().writeInteger(rt, (short)cpu.readHalfWord(address));
                 return;
@@ -355,6 +369,9 @@ public class MipsInstruction {
             //lhu
             case 0b100101: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b1) != address) {
+                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(address));
+                }
                 cpu.registers().writeInteger(rt, cpu.readHalfWord(address) & 0xFFFF);
                 return;
             }
@@ -572,21 +589,47 @@ public class MipsInstruction {
                         float vd = 0.0f;
                         switch (otyp1) {
                             // ADD
-                            case 0: vd = vs1 + vs2; break;
+                            case 0b000000: vd = vs1 + vs2; break;
                             // SUB
-                            case 1: vd = vs1 - vs2; break;
+                            case 0b000001: vd = vs1 - vs2; break;
                             // MUL
-                            case 2: vd = vs1 * vs2; break;
+                            case 0b000010: vd = vs1 * vs2; break;
                             // DIV
-                            case 3: vd = vs1 / vs2; break;
+                            case 0b000011: vd = vs1 / vs2; break;
                             // ABS
-                            case 5:  vd = Math.abs(vs1); break;
+                            case 0b000101:  vd = Math.abs(vs1); break;
                             // MOV
-                            case 6: vd = vs1; break;
+                            case 0b000110: vd = vs1; break;
                             // NEG
-                            case 7: vd = -vs1; break;
+                            case 0b000111: vd = -vs1; break;
+                            // CEIL.W.S
+                            case 0b001110: {
+                                double rounded = Math.ceil(vs1);
+                                int res;
+                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
+                                    res = Integer.MAX_VALUE;
+                                } else {
+                                    res = (int)rounded;
+                                }
+                                cpu.registers().writeInteger(fd, res);
+                                fd = -1;
+                                break;
+                            }
+                            // FLOOR.W.S
+                            case 0b001111: {
+                                double rounded = Math.floor(vs1);
+                                int res;
+                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
+                                    res = Integer.MAX_VALUE;
+                                } else {
+                                    res = (int)rounded;
+                                }
+                                cpu.registers().writeInteger(fd, res);
+                                fd = -1;
+                                break;
+                            }
                             // CVT from S to D
-                            case 33: {
+                            case 0b100000: {
                                 long vdi = Double.doubleToLongBits(vs1);
                                 fd &= ~1;
                                 cpu.registers().writeFloat(fd, (int)(vdi));
@@ -595,7 +638,7 @@ public class MipsInstruction {
                                 break;
                             }
                             // CVT from S to W
-                            case 36: {
+                            case 0b100100: {
                                 cpu.registers().writeFloat(fd, (int)vs1);
                                 fd = -1;
                                 break;
@@ -669,27 +712,53 @@ public class MipsInstruction {
                         double vd = 0;
                         switch (otyp1) {
                             // ADD
-                            case 0: vd = vs1 + vs2; break;
+                            case 0b000000: vd = vs1 + vs2; break;
                             // SUB
-                            case 1: vd = vs1 - vs2; break;
+                            case 0b000001: vd = vs1 - vs2; break;
                             // MUL
-                            case 2: vd = vs1 * vs2; break;
+                            case 0b000010: vd = vs1 * vs2; break;
                             // DIV
-                            case 3: vd = vs1 / vs2; break;
+                            case 0b000011: vd = vs1 / vs2; break;
                             // ABS
-                            case 5: vd = Math.abs(vs1); break;
+                            case 0b000101: vd = Math.abs(vs1); break;
                             // MOV
-                            case 6: vd = vs1; break;
+                            case 0b000110: vd = vs1; break;
                             // NEG
-                            case 7: vd = -vs1; break;
+                            case 0b000111: vd = -vs1; break;
+                            // CEIL.W.D
+                            case 0b001110: {
+                                double rounded = Math.ceil(vs1);
+                                int res;
+                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
+                                    res = Integer.MAX_VALUE;
+                                } else {
+                                    res = (int)rounded;
+                                }
+                                cpu.registers().writeInteger(fd, res);
+                                fd = -1;
+                                break;
+                            }
+                            // FLOOR.W.D
+                            case 0b001111: {
+                                double rounded = Math.floor(vs1);
+                                int res;
+                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
+                                    res = Integer.MAX_VALUE;
+                                } else {
+                                    res = (int)rounded;
+                                }
+                                cpu.registers().writeInteger(fd, res);
+                                fd = -1;
+                                break;
+                            }
                             // CVT from D to S
-                            case 32: {
+                            case 0b100000: {
                                 cpu.registers().writeFloat(fd, Float.floatToIntBits((float)vs1));
                                 fd = -1;
                                 break;
                             }
                             // CVT from D to W
-                            case 36: {
+                            case 0b100100: {
                                 cpu.registers().writeFloat(fd, (int)vs1);
                                 fd = -1;
                                 break;
@@ -836,6 +905,7 @@ public class MipsInstruction {
             case 0b000101: return "bne " + iregs(rs, rt) + ", " + signExtend(imm);
             case 0b100000: return "lb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100100: return "lbu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b110101: return "ldc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100001: return "lh " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100101: return "lhu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001111: return "lui " + ir(rt) + ", " + imm;
@@ -871,30 +941,34 @@ public class MipsInstruction {
                 //SP
                 case 16: {
                     switch (otyp1) {
-                        case 0: return "add.s " + fregs(fd, fs, ft);
-                        case 1: return "sub.s " + fregs(fd, fs, ft);
-                        case 2: return "mul.s " + fregs(fd, fs, ft);
-                        case 3: return "div.s " + fregs(fd, fs, ft);
-                        case 5: return "abs.s " + fregs(fd, fs);
-                        case 6: return "mov.s " + fregs(fd, fs);
-                        case 7: return "neg.s " + fregs(fd, fs);
-                        case 33: return "cvt.d.s " + fregs(fd & ~1, fs);
-                        case 36: return "cvt.w.s " + fregs(fd, fs);
+                        case 0b000000: return "add.s " + fregs(fd, fs, ft);
+                        case 0b000001: return "sub.s " + fregs(fd, fs, ft);
+                        case 0b000010: return "mul.s " + fregs(fd, fs, ft);
+                        case 0b000011: return "div.s " + fregs(fd, fs, ft);
+                        case 0b000101: return "abs.s " + fregs(fd, fs);
+                        case 0b000110: return "mov.s " + fregs(fd, fs);
+                        case 0b000111: return "neg.s " + fregs(fd, fs);
+                        case 0b001110: return "ceil.w.s " + fregs(fd, fs);
+                        case 0b001111: return "floor.w.s " + fregs(fd, fs);
+                        case 0b100001: return "cvt.d.s " + fregs(fd & ~1, fs);
+                        case 0b100100: return "cvt.w.s " + fregs(fd, fs);
                         default: return invalid(instruction, "Unimplemented SP COP1");
                     }
                 }
                 //DP
                 case 17: {
                     switch (otyp1) {
-                        case 0: return "add.d " + fregs(fd, fs, ft);
-                        case 1: return "sub.d " + fregs(fd, fs, ft);
-                        case 2: return "mul.d " + fregs(fd, fs, ft);
-                        case 3: return "div.d " + fregs(fd, fs, ft);
-                        case 5: return "abs.d " + fregs(fd, fs);
-                        case 6: return "mov.d " + fregs(fd, fs);
-                        case 7: return "neg.d " + fregs(fd, fs);
-                        case 32: return "cvt.s.d " + fregs(fd, fs);
-                        case 36: return "cvt.w.d " + fregs(fd, fs);
+                        case 0b000000: return "add.d " + fregs(fd, fs, ft);
+                        case 0b000001: return "sub.d " + fregs(fd, fs, ft);
+                        case 0b000010: return "mul.d " + fregs(fd, fs, ft);
+                        case 0b000011: return "div.d " + fregs(fd, fs, ft);
+                        case 0b000101: return "abs.d " + fregs(fd, fs);
+                        case 0b000110: return "mov.d " + fregs(fd, fs);
+                        case 0b000111: return "neg.d " + fregs(fd, fs);
+                        case 0b001110: return "ceil.w.d " + fregs(fd, fs);
+                        case 0b001111: return "floor.w.d " + fregs(fd, fs);
+                        case 0b100000: return "cvt.s.d " + fregs(fd, fs);
+                        case 0b100100: return "cvt.w.d " + fregs(fd, fs);
                         default: return invalid(instruction, "Unimplemented DP COP1");
                     }
                 }
