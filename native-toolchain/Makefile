@@ -79,7 +79,8 @@ ifdef PROJECT
   override LLCFLAGS += \
       -march=mips -mcpu=mips2 -disable-mips-delay-filler=true
   override OBJFLAGS += \
-      --set-start=${BASE} -S --strip-unneeded -O binary
+      --set-start=${BASE} -S --strip-unneeded -O binary \
+	  --set-section-flags .bss=alloc,load,contents
   override RUSTCFLAGS += \
       --emit=llvm-bc --crate-type=staticlib
 
