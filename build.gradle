@@ -56,6 +56,10 @@ dependencies {
     compile project(':mips-cpu')
 }
 
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
 jar {
     manifest {
         attributes([
