@@ -467,6 +467,17 @@ public class MipsInstruction {
                 cpu.registers().endAtomicUpdate();
                 return;
             }
+            //sdc1
+            case 0b111101: {
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b111) != address) {
+                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(address));
+                }
+                rt &= ~1;
+                cpu.writeWord(address, cpu.registers().readFloat(rt));
+                cpu.writeWord(address+4, cpu.registers().readFloat(rt+1));
+                return;
+            }
             //sh
             case 0b101001: {
                 int addr = cpu.registers().readInteger(rs) + signExtend(imm);
@@ -961,6 +972,7 @@ public class MipsInstruction {
             case 0b001101: return "ori " + iregs(rt, rs) + ", " + imm;
             case 0b101000: return "sb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b111000: return "sc " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b111101: return "sdc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b101001: return "sh " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001010: return "slti " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b001011: return "sltiu " + iregs(rt, rs) + ", " + signExtend(imm);
