@@ -16,7 +16,6 @@ import java.nio.IntBuffer;
         dependencies = "required-after:opencomputers@[1.7.0,)"
 )
 public class OCMips {
-    public static IntBuffer badAppleBuffer;
     static int[] BOOTROM;
     
     @Mod.EventHandler
@@ -32,13 +31,6 @@ public class OCMips {
                     .asIntBuffer();
             BOOTROM = new int[data.remaining()];
             data.get(BOOTROM);
-        }
-        try(InputStream is = OCMips.class.getClassLoader().getResourceAsStream("assets/ocmips/badapple.bin")) {
-            if(is == null) throw new AssertionError("badapple.bin not found");
-            byte[] badApple = IOUtils.toByteArray(is);
-            ByteBuffer bb = MemoryUtils.allocateRounding(badApple.length);
-            bb.put(badApple).position(0);
-            badAppleBuffer = bb.asIntBuffer();
         }
     }
 }

@@ -5,7 +5,6 @@ import com.github.natanbc.mipscpu.MipsException;
 import com.github.natanbc.mipscpu.MipsRegisters;
 import com.github.natanbc.mipscpu.instruction.MipsInstruction;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
-import com.github.natanbc.ocmips.handlers.BadAppleHandler;
 import com.github.natanbc.ocmips.handlers.CleanableHandler;
 import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
 import com.github.natanbc.ocmips.handlers.RemapHandler;
@@ -222,7 +221,6 @@ public class MipsArchitecture implements Architecture {
     private MipsCPU createCPU(int[] bootrom) {
         if(bootrom == null) bootrom = OCMips.BOOTROM;
         MipsCPU c = new MipsCPU(bootrom);
-        c.addMemoryHandler(0x13370000, new BadAppleHandler());
         c.setSyscallHandler(cpu -> {
             switch (cpu.registers().readInteger(MipsRegisters.V0)) {
                 //sleep

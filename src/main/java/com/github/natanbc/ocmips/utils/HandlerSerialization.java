@@ -2,7 +2,6 @@ package com.github.natanbc.ocmips.utils;
 
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
-import com.github.natanbc.ocmips.handlers.BadAppleHandler;
 import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
 import com.github.natanbc.ocmips.handlers.DriveHandler;
 import com.github.natanbc.ocmips.handlers.EEPROMHandler;
@@ -80,10 +79,6 @@ public class HandlerSerialization {
             tag.setInteger("size", h.getSize());
             return;
         }
-        if(handler instanceof BadAppleHandler) {
-            tag.setString("type", "bad_apple");
-            return;
-        }
         throw new AssertionError();
     }
 
@@ -124,9 +119,6 @@ public class HandlerSerialization {
                 return new RemapHandler(
                         tag.getInteger("target"), tag.getInteger("size")
                 );
-            }
-            case "bad_apple": {
-                return new BadAppleHandler();
             }
             default: throw new AssertionError();
         }
