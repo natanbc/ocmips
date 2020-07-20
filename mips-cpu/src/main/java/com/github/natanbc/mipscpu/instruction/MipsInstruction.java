@@ -214,6 +214,10 @@ public class MipsInstruction {
                         cpu.registers().readInteger(rs) - cpu.registers().readInteger(rt));
                 return;
             }
+            //sync, or as i like to call it, 𝓃𝑜𝓅
+            case 0b001111: {
+                return;
+            }
             //syscall
             case 0b001100: {
                 SyscallHandler h = cpu.getSyscallHandler();
@@ -904,6 +908,7 @@ public class MipsInstruction {
             case 0b000110: return "srlv " + iregs(rd, rt, rs);
             case 0b100010: return "sub " + iregs(rd, rs, rt);
             case 0b100011: return "subu " + iregs(rd, rs, rt);
+            case 0b001111: return "sync"; // or as i like to call it, 𝓃𝑜𝓅
             case 0b001100: return "syscall";
             case 0b110100: return "teq " + iregs(rs, rt);
             case 0b100110: return "xor " + iregs(rd, rs, rt);
