@@ -214,7 +214,7 @@ public class MipsInstruction {
                         cpu.registers().readInteger(rs) - cpu.registers().readInteger(rt));
                 return;
             }
-            //sync, or as i like to call it, 𝓃𝑜𝓅
+            //sync, or as i like to call it, fancy nop
             case 0b001111: {
                 return;
             }
@@ -674,11 +674,11 @@ public class MipsInstruction {
                                 break;
                             }
                             // CVT from S to D
-                            case 0b100000: {
+                            case 0b100001: {
                                 long vdi = Double.doubleToLongBits(vs1);
                                 fd &= ~1;
-                                cpu.registers().writeFloat(fd, (int)(vdi));
-                                cpu.registers().writeFloat(fd + 1, (int)(vdi>>>32));
+                                cpu.registers().writeFloat(fd, (int)(vdi>>>32));
+                                cpu.registers().writeFloat(fd + 1, (int)(vdi));
                                 fd = -1;
                                 break;
                             }
@@ -699,14 +699,8 @@ public class MipsInstruction {
                 //DP
                 case 17: {
                     fs &= ~1; ft &= ~1;
-                    double vs1 = Double.longBitsToDouble(
-                            (((long)cpu.registers().readFloat(fs))&0xFFFFFFFFL)
-                                    |((((long)cpu.registers().readFloat(fs+1))&0xFFFFFFFFL)<<32L)
-                    );
-                    double vs2 = Double.longBitsToDouble(
-                            (((long)cpu.registers().readFloat(ft))&0xFFFFFFFFL)
-                                    |((((long)cpu.registers().readFloat(ft+1))&0xFFFFFFFFL)<<32L)
-                    );
+                    double vs1 = long2double(cpu.registers().readFloat(fs), cpu.registers().readFloat(fs + 1));
+                    double vs2 = long2double(cpu.registers().readFloat(ft), cpu.registers().readFloat(ft + 1));
                     //c.<cond>.d
                     if((otyp1 & 0b110000) == 0b110000) {
                         int cc = (instruction>>8)&0b111;
@@ -813,8 +807,8 @@ public class MipsInstruction {
                         if (fd != -1) {
                             long vdi = Double.doubleToLongBits(vd);
                             fd &= ~1;
-                            cpu.registers().writeFloat(fd, (int)(vdi));
-                            cpu.registers().writeFloat(fd+1, (int)(vdi>>>32));
+                            cpu.registers().writeFloat(fd, (int)(vdi>>>32));
+                            cpu.registers().writeFloat(fd+1, (int)(vdi));
                         }
                     }
                     break;
@@ -886,6 +880,11 @@ public class MipsInstruction {
         }
     }
 
+    private static double long2double(int upper, int lower) {
+        long l = ((upper & 0xFFFFFFFFL) << 32) | (lower & 0xFFFFFFFFL);
+        return Double.longBitsToDouble(l);
+    }
+
     private static String toStringOpcode0(int instruction) {
         int func =   instruction & 0b111111;
         int rd =    (instruction << 16) >>> 27;
@@ -919,7 +918,7 @@ public class MipsInstruction {
             case 0b000110: return "srlv " + iregs(rd, rt, rs);
             case 0b100010: return "sub " + iregs(rd, rs, rt);
             case 0b100011: return "subu " + iregs(rd, rs, rt);
-            case 0b001111: return "sync"; // or as i like to call it, 𝓃𝑜𝓅
+            case 0b001111: return "sync"; // or as i like to call it, fancy nop
             case 0b001100: return "syscall";
             case 0b110100: return "teq " + iregs(rs, rt);
             case 0b100110: return "xor " + iregs(rd, rs, rt);
@@ -997,7 +996,7 @@ public class MipsInstruction {
         if(rs >= 16) {
             switch (rs) {
                 //SP
-                case 16: {
+                case 0b10000: {
                     switch (otyp1) {
                         case 0b000000: return "add.s " + fregs(fd, fs, ft);
                         case 0b000001: return "sub.s " + fregs(fd, fs, ft);
@@ -1017,7 +1016,7 @@ public class MipsInstruction {
                     }
                 }
                 //DP
-                case 17: {
+                case 0b10001: {
                     switch (otyp1) {
                         case 0b000000: return "add.d " + fregs(fd, fs, ft);
                         case 0b000001: return "sub.d " + fregs(fd, fs, ft);
@@ -1037,10 +1036,10 @@ public class MipsInstruction {
                     }
                 }
                 // W
-                case 20: {
+                case 0b10100: {
                     switch (otyp1) {
-                        case 32: return "cvt.s.w " + fregs(fd, fs);
-                        case 33: return "cvt.d.w " + fregs(fd, fs);
+                        case 0b100000: return "cvt.s.w " + fregs(fd, fs);
+                        case 0b100001: return "cvt.d.w " + fregs(fd, fs);
                         default: return invalid(instruction, "Unimplemented W COP1");
                     }
                 }
