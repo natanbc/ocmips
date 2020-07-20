@@ -375,6 +375,16 @@ public class MipsInstruction {
                 cpu.registers().writeInteger(rt, cpu.readHalfWord(address) & 0xFFFF);
                 return;
             }
+            //ll
+            case 0b110000: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((addr & ~0b11) != addr) {
+                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
+                }
+                cpu.registers().writeInteger(rt, cpu.readWord(addr));
+                cpu.registers().startAtomicUpdate(addr);
+                return;
+            }
             //lui
             case 0b001111: {
                 cpu.registers().writeInteger(rt, imm << 16);
@@ -437,9 +447,29 @@ public class MipsInstruction {
                         0xFF & cpu.registers().readInteger(rt));
                 return;
             }
+            //sc
+            case 0b111000: {
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((addr & ~0b11) != addr) {
+                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                }
+                if(cpu.registers().isAtomicUpdateValid(addr)) {
+                    //the write also stops the atomic update
+                    cpu.writeWord(addr, rt);
+                    cpu.registers().writeInteger(rt, 1);
+                } else {
+                    cpu.registers().writeInteger(rt, 0);
+                }
+                cpu.registers().endAtomicUpdate();
+                return;
+            }
             //sh
             case 0b101001: {
-                cpu.writeHalfWord(cpu.registers().readInteger(rs) + signExtend(imm),
+                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((addr & ~0b1) != addr) {
+                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                }
+                cpu.writeHalfWord(addr,
                         0xFFFF & cpu.registers().readInteger(rt));
                 return;
             }
@@ -908,6 +938,7 @@ public class MipsInstruction {
             case 0b110101: return "ldc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100001: return "lh " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100101: return "lhu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b110000: return "ll " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001111: return "lui " + ir(rt) + ", " + imm;
             case 0b100011: return "lw " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b110001: return "lwc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
@@ -915,6 +946,7 @@ public class MipsInstruction {
             case 0b100110: return "lwr " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001101: return "ori " + iregs(rt, rs) + ", " + imm;
             case 0b101000: return "sb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
+            case 0b111000: return "sc " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b101001: return "sh " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001010: return "slti " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b001011: return "sltiu " + iregs(rt, rs) + ", " + signExtend(imm);

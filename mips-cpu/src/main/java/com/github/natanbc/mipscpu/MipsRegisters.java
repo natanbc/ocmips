@@ -12,8 +12,9 @@ public class MipsRegisters {
             T8 =   24, T9 = 25, K0 = 26, K1 = 27,
             GP =   28, SP = 29, FP = 30, RA = 31,
             //following registers can't be encoded directly
-            PC =   32, LO = 33, HI = 34;
-    public static final int INTEGER_COUNT = 35;
+            PC =   32, LO = 33, HI = 34,
+            RMW_ADDRESS = 35, RMW_VALID = 36;
+    public static final int INTEGER_COUNT = 37;
     private static final String[] INTEGER_NAMES = {
             "$zero", "$at", "$v0", "$v1",
             "$a0", "$a1", "$a2", "$a3",
@@ -95,6 +96,20 @@ public class MipsRegisters {
         //number ^= (-x ^ number) & (1UL << n);
         v ^= (-(value ? 1 : 0) ^ v) & (1 << cc);
         fpRegisters[FP_CC] = v;
+    }
+
+    public void startAtomicUpdate(int address) {
+        writeInteger(RMW_ADDRESS, address);
+        writeInteger(RMW_VALID, 1);
+    }
+
+    public boolean isAtomicUpdateValid(int address) {
+        return readInteger(RMW_VALID) != 0 && readInteger(RMW_ADDRESS) == address;
+    }
+
+    public void endAtomicUpdate() {
+        writeInteger(RMW_ADDRESS, 0);
+        writeInteger(RMW_VALID, 0);
     }
 
     public static String integerName(int reg) {

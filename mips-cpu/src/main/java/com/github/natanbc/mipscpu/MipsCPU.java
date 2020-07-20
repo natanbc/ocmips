@@ -118,6 +118,9 @@ public class MipsCPU {
     }
 
     public void writeWord(int address, int value) throws MemoryOperationException {
+        if(registers.readInteger(MipsRegisters.RMW_ADDRESS) == address) {
+            registers.endAtomicUpdate();
+        }
         MemoryHandler handler = handlerFor(address);
         if(handler != null) {
             handler.write(this, address, value);
