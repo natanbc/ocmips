@@ -630,6 +630,8 @@ public class MipsInstruction {
                             case 0b000010: vd = vs1 * vs2; break;
                             // DIV
                             case 0b000011: vd = vs1 / vs2; break;
+                            // SQRT.S
+                            case 0b000100: vd = (float)Math.sqrt(vs1); break;
                             // ABS
                             case 0b000101:  vd = Math.abs(vs1); break;
                             // MOV
@@ -638,27 +640,25 @@ public class MipsInstruction {
                             case 0b000111: vd = -vs1; break;
                             // CEIL.W.S
                             case 0b001110: {
-                                double rounded = Math.ceil(vs1);
-                                int res;
-                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
-                                    res = Integer.MAX_VALUE;
-                                } else {
-                                    res = (int)rounded;
-                                }
-                                cpu.registers().writeInteger(fd, res);
+                                cpu.registers().writeInteger(fd, truncToFixed(Math.ceil(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // FLOOR.W.S
                             case 0b001111: {
-                                double rounded = Math.floor(vs1);
-                                int res;
-                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
-                                    res = Integer.MAX_VALUE;
-                                } else {
-                                    res = (int)rounded;
-                                }
-                                cpu.registers().writeInteger(fd, res);
+                                cpu.registers().writeInteger(fd, truncToFixed(Math.floor(vs1)));
+                                fd = -1;
+                                break;
+                            }
+                            // ROUND.W.S
+                            case 0b001100: {
+                                cpu.registers().writeInteger(fd, truncToFixed(Math.round(vs1)));
+                                fd = -1;
+                                break;
+                            }
+                            // TRUNC.W.S
+                            case 0b001101: {
+                                cpu.registers().writeInteger(fd, truncToFixed(vs1));
                                 fd = -1;
                                 break;
                             }
@@ -753,6 +753,8 @@ public class MipsInstruction {
                             case 0b000010: vd = vs1 * vs2; break;
                             // DIV
                             case 0b000011: vd = vs1 / vs2; break;
+                            // SQRT.D
+                            case 0b000100: vd = Math.sqrt(vs1); break;
                             // ABS
                             case 0b000101: vd = Math.abs(vs1); break;
                             // MOV
@@ -761,27 +763,25 @@ public class MipsInstruction {
                             case 0b000111: vd = -vs1; break;
                             // CEIL.W.D
                             case 0b001110: {
-                                double rounded = Math.ceil(vs1);
-                                int res;
-                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
-                                    res = Integer.MAX_VALUE;
-                                } else {
-                                    res = (int)rounded;
-                                }
-                                cpu.registers().writeInteger(fd, res);
+                                cpu.registers().writeInteger(fd, truncToFixed(Math.ceil(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // FLOOR.W.D
                             case 0b001111: {
-                                double rounded = Math.floor(vs1);
-                                int res;
-                                if(rounded < Integer.MIN_VALUE || rounded > Integer.MAX_VALUE) {
-                                    res = Integer.MAX_VALUE;
-                                } else {
-                                    res = (int)rounded;
-                                }
-                                cpu.registers().writeInteger(fd, res);
+                                cpu.registers().writeInteger(fd, truncToFixed(Math.floor(vs1)));
+                                fd = -1;
+                                break;
+                            }
+                            // ROUND.W.D
+                            case 0b001100: {
+                                cpu.registers().writeInteger(fd, truncToFixed(Math.round(vs1)));
+                                fd = -1;
+                                break;
+                            }
+                            // TRUNC.W.D
+                            case 0b001101: {
+                                cpu.registers().writeInteger(fd, truncToFixed(vs1));
                                 fd = -1;
                                 break;
                             }
@@ -916,6 +916,15 @@ public class MipsInstruction {
         }
     }
 
+    // if the value isn't in the range [-2^31, 2^31 - 1], returns 2^31 - 1
+    private static int truncToFixed(double val) {
+        if(val < Integer.MIN_VALUE || val > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        } else {
+            return (int) val;
+        }
+    }
+
     private static String toStringI(int instruction) {
         int rs =  (instruction <<  6) >>> 27;
         int rt =  (instruction << 11) >>> 27;
@@ -982,11 +991,14 @@ public class MipsInstruction {
                         case 0b000001: return "sub.s " + fregs(fd, fs, ft);
                         case 0b000010: return "mul.s " + fregs(fd, fs, ft);
                         case 0b000011: return "div.s " + fregs(fd, fs, ft);
+                        case 0b000100: return "sqrt.s " + fregs(fd, fs);
                         case 0b000101: return "abs.s " + fregs(fd, fs);
                         case 0b000110: return "mov.s " + fregs(fd, fs);
                         case 0b000111: return "neg.s " + fregs(fd, fs);
                         case 0b001110: return "ceil.w.s " + fregs(fd, fs);
                         case 0b001111: return "floor.w.s " + fregs(fd, fs);
+                        case 0b001100: return "round.w.s " + fregs(fd, fs);
+                        case 0b001101: return "trunc.w.s " + fregs(fd, fs);
                         case 0b100001: return "cvt.d.s " + fregs(fd & ~1, fs);
                         case 0b100100: return "cvt.w.s " + fregs(fd, fs);
                         default: return invalid(instruction, "Unimplemented SP COP1");
@@ -999,11 +1011,14 @@ public class MipsInstruction {
                         case 0b000001: return "sub.d " + fregs(fd, fs, ft);
                         case 0b000010: return "mul.d " + fregs(fd, fs, ft);
                         case 0b000011: return "div.d " + fregs(fd, fs, ft);
+                        case 0b000100: return "sqrt.d " + fregs(fd, fs);
                         case 0b000101: return "abs.d " + fregs(fd, fs);
                         case 0b000110: return "mov.d " + fregs(fd, fs);
                         case 0b000111: return "neg.d " + fregs(fd, fs);
                         case 0b001110: return "ceil.w.d " + fregs(fd, fs);
                         case 0b001111: return "floor.w.d " + fregs(fd, fs);
+                        case 0b001100: return "round.w.d " + fregs(fd, fs);
+                        case 0b001101: return "trunc.w.d " + fregs(fd, fs);
                         case 0b100000: return "cvt.s.d " + fregs(fd, fs);
                         case 0b100100: return "cvt.w.d " + fregs(fd, fs);
                         default: return invalid(instruction, "Unimplemented DP COP1");
