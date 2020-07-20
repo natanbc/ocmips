@@ -79,3 +79,9 @@ rt_ramsize: .globl rt_ramsize
     syscall
     jr $ra
 
+# float rt_uptime();
+.section .text.rt_uptime
+rt_uptime: .globl rt_uptime
+    li $v0, 12
+    syscall
+    jr $ra

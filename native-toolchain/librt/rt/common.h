@@ -24,3 +24,5 @@ int rt_mremap(void* addr, void* target, int size);
 
 int rt_ramsize();
 
+float rt_uptime();
+

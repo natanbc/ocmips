@@ -408,6 +408,12 @@ public class MipsArchitecture implements Architecture {
                     cpu.registers().writeInteger(MipsRegisters.V0, ramWords * 4);
                     return;
                 }
+                //uptime
+                //returns uptime in $f0
+                case 12: {
+                    cpu.registers().writeFloat(MipsRegisters.F0, Float.floatToIntBits((float)machine.upTime()));
+                    return;
+                }
                 default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
             }
         });
