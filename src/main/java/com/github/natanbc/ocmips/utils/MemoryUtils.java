@@ -3,10 +3,12 @@ package com.github.natanbc.ocmips.utils;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 public class MemoryUtils {
@@ -52,17 +54,17 @@ public class MemoryUtils {
 
     public static String readString(MipsCPU cpu, int address) throws MemoryOperationException {
         if(address == 0) return null;
-        StringBuilder sb = new StringBuilder();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         int b;
         while((b = cpu.readByte(address)) != 0) {
-            sb.append((char)b);
+            baos.write(b);
             //no massive strings
-            if(sb.length() > 2048) {
+            if(baos.size() > 2048) {
                 throw new MemoryOperationException(address, MemoryOperationException.Reason.INVALID_VALUE);
             }
             address++;
         }
-        return sb.toString();
+        return new String(baos.toByteArray(), StandardCharsets.UTF_8);
     }
     
     public static String readAddress(MipsCPU cpu, int address) throws MemoryOperationException {
