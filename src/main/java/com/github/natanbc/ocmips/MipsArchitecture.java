@@ -4,6 +4,7 @@ import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.MipsException;
 import com.github.natanbc.mipscpu.MipsRegisters;
 import com.github.natanbc.mipscpu.instruction.MipsInstruction;
+import com.github.natanbc.mipscpu.instruction.TrapException;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.ocmips.handlers.CleanableHandler;
 import com.github.natanbc.ocmips.handlers.ComponentCallHandler;
@@ -119,6 +120,13 @@ public class MipsArchitecture implements Architecture {
                 cpu.step();
             }
             return new ExecutionResult.Sleep(1);
+        } catch (TrapException e) {
+            int cause = cpu.registers().readCop0(MipsRegisters.C0_CAUSE);
+            TrapException.Cause c = TrapException.Cause.fromCode(cause);
+            return new ExecutionResult.Error(
+                    c == null ? "Double fault! Got " + e.getTrapCause() + ", c0_cause = " + cause :
+                            "Double fault! Got " + e.getTrapCause() + ", c0_cause = " + cause + " (" + c + ")"
+            );
         } catch (MipsException e) {
             //e.printStackTrace(new PrintStream(new FileOutputStream(FileDescriptor.out)));
             try {
@@ -226,15 +234,21 @@ public class MipsArchitecture implements Architecture {
                 //sleep
                 //$a0 has the time to sleep
                 //returns nothing
-                case 1: throw new StopExecution(new ExecutionResult.Sleep(
-                        cpu.registers().readInteger(MipsRegisters.A0)
-                ));
+                case 1: {
+                    cpu.registers().writeInteger(MipsRegisters.PC, cpu.registers().readInteger(MipsRegisters.PC) + 4);
+                    throw new StopExecution(new ExecutionResult.Sleep(
+                            cpu.registers().readInteger(MipsRegisters.A0)
+                    ));
+                }
                 //shutdown
                 //$a0 is whether or not to reboot. anything other than 0 is a reboot
                 //never returns
-                case 2: throw new StopExecution(new ExecutionResult.Shutdown(
-                        cpu.registers().readInteger(MipsRegisters.A0) != 0
-                ));
+                case 2: {
+                    cpu.registers().writeInteger(MipsRegisters.PC, cpu.registers().readInteger(MipsRegisters.PC) + 4);
+                    throw new StopExecution(new ExecutionResult.Shutdown(
+                            cpu.registers().readInteger(MipsRegisters.A0) != 0
+                    ));
+                }
                 //map special component
                 //$a0 has the memory address to map into
                 //$a1 has the component address
@@ -332,6 +346,7 @@ public class MipsArchitecture implements Architecture {
                     } else {
                         bsod(addr, msg);
                     }
+                    /* no need to update the pc since we crashed anyway */
                     throw new RetryInNextTick(null);
                 }
                 //popSignal

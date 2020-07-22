@@ -3,8 +3,10 @@ package com.github.natanbc.mipscpu.instruction;
 import com.github.natanbc.mipscpu.MipsCPU;
 import com.github.natanbc.mipscpu.MipsException;
 import com.github.natanbc.mipscpu.MipsRegisters;
+import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 
 import static com.github.natanbc.mipscpu.MipsRegisters.*;
+import static com.github.natanbc.mipscpu.instruction.TrapException.Cause.*;
 
 public class MipsInstruction {
     public static void execute(MipsCPU cpu, int instruction) throws MipsException {
@@ -44,7 +46,6 @@ public class MipsInstruction {
         }
     }
 
-    @SuppressWarnings("DuplicateBranchesInSwitch")
     private static void executeOpcode0(MipsCPU cpu, int instruction) throws MipsException {
         int func =   instruction & 0b111111;
         int rd =    (instruction << 16) >>> 27;
@@ -54,9 +55,14 @@ public class MipsInstruction {
         switch (func) {
             //add
             case 0b100000:  {
-                cpu.registers().writeInteger(rd,
-                        cpu.registers().readInteger(rs) + cpu.registers().readInteger(rt));
-                //TODO overflow check
+                int a = cpu.registers().readInteger(rs);
+                int b = cpu.registers().readInteger(rt);
+                int res = a + b;
+                //overflow check
+                if(((a ^ res) & (b ^ res)) < 0) {
+                    throw new TrapException(Ov);
+                }
+                cpu.registers().writeInteger(rd, res);
                 return;
             }
             //addu
@@ -73,7 +79,7 @@ public class MipsInstruction {
             }
             //break
             case 0b001101: {
-                throw new TrapException(instruction, 1);
+                throw new TrapException(Bp);
             }
             //div
             case 0b011010: {
@@ -125,15 +131,23 @@ public class MipsInstruction {
             }
             //mult
             case 0b011000: {
-                cpu.registers().writeInteger(LO,
-                        cpu.registers().readInteger(rs) * cpu.registers().readInteger(rt));
-                //TODO overflow check
+                int a = cpu.registers().readInteger(rs);
+                int b = cpu.registers().readInteger(rt);
+                long res = (long)a * (long)b;
+
+                cpu.registers().writeInteger(LO, (int)res);
+                cpu.registers().writeInteger(HI, (int)(res >>> 32));
                 return;
             }
             //multu
             case 0b011001: {
-                cpu.registers().writeInteger(LO,
-                        cpu.registers().readInteger(rs) * cpu.registers().readInteger(rt));
+                int a = cpu.registers().readInteger(rs);
+                int b = cpu.registers().readInteger(rt);
+
+                long res = ((long)a & 0xFFFFFFFFL) * ((long)b & 0xFFFFFFFFL);
+
+                cpu.registers().writeInteger(LO, (int)(res >> 32));
+                cpu.registers().writeInteger(HI, (int)((res << 32) >> 32));
                 return;
             }
             //nor
@@ -203,9 +217,14 @@ public class MipsInstruction {
             }
             //sub
             case 0b100010: {
-                cpu.registers().writeInteger(rd,
-                        cpu.registers().readInteger(rs) - cpu.registers().readInteger(rt));
-                //TODO overflow check
+                int a = cpu.registers().readInteger(rs);
+                int b = cpu.registers().readInteger(rt);
+                int res = a - b;
+                //overflow check
+                if(((a ^ b) & (a ^ res)) < 0) {
+                    throw new TrapException(Ov);
+                }
+                cpu.registers().writeInteger(rd, res);
                 return;
             }
             //subu
@@ -220,22 +239,12 @@ public class MipsInstruction {
             }
             //syscall
             case 0b001100: {
-                SyscallHandler h = cpu.getSyscallHandler();
-                if(h == null) {
-                    throw new InstructionExecutionException("No syscall handler set!");
-                }
-                try {
-                    h.handleSyscall(cpu);
-                } catch (RuntimeException e) {
-                    cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4);
-                    throw e;
-                }
-                return;
+                throw new TrapException(Sys);
             }
             //teq
             case 0b110100: {
                 if(cpu.registers().readInteger(rs) == cpu.registers().readInteger(rt)) {
-                    throw new TrapException(instruction, 0);
+                    throw new TrapException(Tr);
                 }
                 return;
             }
@@ -245,7 +254,7 @@ public class MipsInstruction {
                         cpu.registers().readInteger(rs) ^ cpu.registers().readInteger(rt));
                 return;
             }
-            default: throw new IllegalInstructionException(instruction, "Unknown func " + func);
+            default: throw new TrapException(RI, "Unknown func " + func);
         }
     }
 
@@ -259,8 +268,14 @@ public class MipsInstruction {
         switch (instruction >>> 26) {
             //addi
             case 0b001000: {
-                cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) + signExtend(imm));
-                //TODO overflow check
+                int a = cpu.registers().readInteger(rs);
+                int b = signExtend(imm);
+                int res = a + b;
+                //overflow check
+                if(((a ^ res) & (b ^ res)) < 0) {
+                    throw new TrapException(Ov);
+                }
+                cpu.registers().writeInteger(rt, res);
                 return;
             }
             //addiu
@@ -313,7 +328,7 @@ public class MipsInstruction {
                         }
                         return;
                     }
-                    default: throw new IllegalInstructionException(instruction, "Unknown branch type " + Integer.toBinaryString(rt));
+                    default: throw new TrapException(RI, "Unknown branch type " + Integer.toBinaryString(rt));
                 }
             //bgtz
             case 0b000111: {
@@ -339,54 +354,83 @@ public class MipsInstruction {
             //lb
             case 0b100000: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
-                //cast to byte to sign-extend
-                cpu.registers().writeInteger(rt, (byte)cpu.readByte(address));
+                try {
+                    //cast to byte to sign-extend
+                    cpu.registers().writeInteger(rt, (byte)cpu.readByte(address));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //lbu
             case 0b100100: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
-                cpu.registers().writeInteger(rt, cpu.readByte(address) & 0xFF);
+                try {
+                    cpu.registers().writeInteger(rt, cpu.readByte(address) & 0xFF);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //ldc1
             case 0b110101: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
                 if((address & ~0b111) != address) {
-                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(address));
+                    //TODO `throw cpu.addressError(address)`?
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdEL, "Unaligned memory read to 0x" + Integer.toHexString(address));
                 }
                 rt &= ~1;
-                cpu.registers().writeFloat(rt, cpu.readWord(address));
-                cpu.registers().writeFloat(rt+1, cpu.readWord(address+4));
+                try {
+                    cpu.registers().writeFloat(rt, cpu.readWord(address));
+                    cpu.registers().writeFloat(rt + 1, cpu.readWord(address + 4));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //lh
             case 0b100001: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
                 if((address & ~0b1) != address) {
-                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(address));
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdEL, "Unaligned memory read to 0x" + Integer.toHexString(address));
                 }
-                //cast to short to sign-extend
-                cpu.registers().writeInteger(rt, (short)cpu.readHalfWord(address));
+                try {
+                    //cast to short to sign-extend
+                    cpu.registers().writeInteger(rt, (short)cpu.readHalfWord(address));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //lhu
             case 0b100101: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
                 if((address & ~0b1) != address) {
-                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(address));
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdEL, "Unaligned memory read to 0x" + Integer.toHexString(address));
                 }
-                cpu.registers().writeInteger(rt, cpu.readHalfWord(address) & 0xFFFF);
+                try {
+                    cpu.registers().writeInteger(rt, cpu.readHalfWord(address) & 0xFFFF);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //ll
             case 0b110000: {
-                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                if((addr & ~0b11) != addr) {
-                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b11) != address) {
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdEL, "Unaligned memory read to 0x" + Integer.toHexString(address));
                 }
-                cpu.registers().writeInteger(rt, cpu.readWord(addr));
-                cpu.registers().startAtomicUpdate(addr);
+                try {
+                    cpu.registers().writeInteger(rt, cpu.readWord(address));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
+                cpu.registers().startAtomicUpdate(address);
                 return;
             }
             //lui
@@ -396,26 +440,41 @@ public class MipsInstruction {
             }
             //lw
             case 0b100011: {
-                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                if((addr & ~0b11) != addr) {
-                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b11) != address) {
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdEL, "Unaligned memory read to 0x" + Integer.toHexString(address));
                 }
-                cpu.registers().writeInteger(rt, cpu.readWord(addr));
+                try {
+                    cpu.registers().writeInteger(rt, cpu.readWord(address));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //lwc1
             case 0b110001: {
-                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                if((addr & ~0b11) != addr) {
-                    throw new InstructionExecutionException("Unaligned memory read to 0x" + Integer.toHexString(addr));
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b11) != address) {
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdEL, "Unaligned memory read to 0x" + Integer.toHexString(address));
                 }
-                cpu.registers().writeFloat(rt, cpu.readWord(addr));
+                try {
+                    cpu.registers().writeFloat(rt, cpu.readWord(address));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //lwl
             case 0b100010: {
                 int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                int word = cpu.readWord(addr & ~0b11);
+                int word;
+                try {
+                    word = cpu.readWord(addr & ~0b11);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 int register = cpu.registers().readInteger(rt);
                 switch (addr & 0b11) {
                     case 0: register = word; break;
@@ -429,7 +488,12 @@ public class MipsInstruction {
             //lwr
             case 0b100110: {
                 int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                int word = cpu.readWord(addr & ~0b11);
+                int word;
+                try {
+                    word = cpu.readWord(addr & ~0b11);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 int register = cpu.registers().readInteger(rt);
                 switch (addr & 0b11) {
                     case 0: register = ((word>>>24) & 0x0000FF) | (register & ~0x0000FF); break;
@@ -447,19 +511,28 @@ public class MipsInstruction {
             }
             //sb
             case 0b101000: {
-                cpu.writeByte(cpu.registers().readInteger(rs) + signExtend(imm),
-                        0xFF & cpu.registers().readInteger(rt));
+                try {
+                    cpu.writeByte(cpu.registers().readInteger(rs) + signExtend(imm),
+                            0xFF & cpu.registers().readInteger(rt));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //sc
             case 0b111000: {
-                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                if((addr & ~0b11) != addr) {
-                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b11) != address) {
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdES, "Unaligned memory write to 0x" + Integer.toHexString(address));
                 }
-                if(cpu.registers().isAtomicUpdateValid(addr)) {
+                if(cpu.registers().isAtomicUpdateValid(address)) {
                     //the write also stops the atomic update
-                    cpu.writeWord(addr, rt);
+                    try {
+                        cpu.writeWord(address, rt);
+                    } catch (MemoryOperationException e) {
+                        throw new TrapException(DBE);
+                    }
                     cpu.registers().writeInteger(rt, 1);
                 } else {
                     cpu.registers().writeInteger(rt, 0);
@@ -471,21 +544,31 @@ public class MipsInstruction {
             case 0b111101: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
                 if((address & ~0b111) != address) {
-                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(address));
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdES, "Unaligned memory write to 0x" + Integer.toHexString(address));
                 }
                 rt &= ~1;
-                cpu.writeWord(address, cpu.registers().readFloat(rt));
-                cpu.writeWord(address+4, cpu.registers().readFloat(rt+1));
+                try {
+                    cpu.writeWord(address, cpu.registers().readFloat(rt));
+                    cpu.writeWord(address + 4, cpu.registers().readFloat(rt + 1));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //sh
             case 0b101001: {
-                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                if((addr & ~0b1) != addr) {
-                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b1) != address) {
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdES, "Unaligned memory write to 0x" + Integer.toHexString(address));
                 }
-                cpu.writeHalfWord(addr,
-                        0xFFFF & cpu.registers().readInteger(rt));
+                try {
+                    cpu.writeHalfWord(address,
+                            0xFFFF & cpu.registers().readInteger(rt));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //slti
@@ -508,26 +591,41 @@ public class MipsInstruction {
             }
             //sw
             case 0b101011: {
-                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                if((addr & ~0b11) != addr) {
-                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b11) != address) {
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdES, "Unaligned memory write to 0x" + Integer.toHexString(address));
                 }
-                cpu.writeWord(addr, cpu.registers().readInteger(rt));
+                try {
+                    cpu.writeWord(address, cpu.registers().readInteger(rt));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //swc1
             case 0b111001: {
-                int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                if((addr & ~0b11) != addr) {
-                    throw new InstructionExecutionException("Unaligned memory write to 0x" + Integer.toHexString(addr));
+                int address = cpu.registers().readInteger(rs) + signExtend(imm);
+                if((address & ~0b11) != address) {
+                    cpu.registers().writeInteger(C0_VADDR, address);
+                    throw new TrapException(AdES, "Unaligned memory write to 0x" + Integer.toHexString(address));
                 }
-                cpu.writeWord(addr, cpu.registers().readFloat(rt));
+                try {
+                    cpu.writeWord(address, cpu.registers().readFloat(rt));
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //swl
             case 0b101010: {
                 int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                int word = cpu.readWord(addr & ~0b11);
+                int word;
+                try {
+                    word = cpu.readWord(addr & ~0b11);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 int register = cpu.registers().readInteger(rt);
                 switch (addr & 0b11) {
                     case 0: word = register; break;
@@ -535,13 +633,22 @@ public class MipsInstruction {
                     case 2: word = (word & 0xFFFF0000) | (register >>> 16); break;
                     case 3: word = (word & 0xFFFFFF00) | (register >>>  8); break;
                 }
-                cpu.writeWord(addr & ~0b11, word);
+                try {
+                    cpu.writeWord(addr & ~0b11, word);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //swr
             case 0b101110: {
                 int addr = cpu.registers().readInteger(rs) + signExtend(imm);
-                int word = cpu.readWord(addr & ~0b11);
+                int word;
+                try {
+                    word = cpu.readWord(addr & ~0b11);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 int register = cpu.registers().readInteger(rt);
                 switch (addr & 0b11) {
                     case 0: word = ((register & 0x0000FF) << 24) | (word & 0xFFFFFF); break;
@@ -549,7 +656,11 @@ public class MipsInstruction {
                     case 2: word = ((register & 0xFFFFFF) <<  8) | (word & 0x0000FF); break;
                     case 3: word = register; break;
                 }
-                cpu.writeWord(addr & ~0b11, word);
+                try {
+                    cpu.writeWord(addr & ~0b11, word);
+                } catch (MemoryOperationException e) {
+                    throw new TrapException(DBE);
+                }
                 return;
             }
             //xori
@@ -557,12 +668,69 @@ public class MipsInstruction {
                 cpu.registers().writeInteger(rt, cpu.registers().readInteger(rs) ^ imm);
                 return;
             }
+            //COP0
+            case 0b010000: {
+                executeCOP0(cpu, instruction);
+                return;
+            }
             //COP1
             case 0b010001: {
                 executeCOP1(cpu, instruction);
                 return;
             }
-            default: throw new IllegalInstructionException(instruction, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
+            default: throw new TrapException(RI, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
+        }
+    }
+
+    private static void executeCOP0(MipsCPU cpu, int instruction) throws MipsException {
+        boolean co = ((instruction >>> 25) & 0b1) == 0b1;
+        if(co) {
+            int op = instruction & 0b111111;
+            switch (op) {
+                //deret
+                case 0b011111: {
+                    throw new TrapException(RI, "deret");
+                }
+                //eret
+                case 0b011000: {
+                    cpu.registers().endAtomicUpdate();
+                    cpu.registers().writeInteger(PC, cpu.registers().readCop0(C0_EPC));
+                    cpu.registers().writeStatusBit(STATUS_EXCEPTION_LEVEL, false);
+                    return;
+                }
+                //tlbp
+                case 0b001000:
+                //tlbr
+                case 0b000001:
+                //tlbwi
+                case 0b000010:
+                //tlbwr
+                case 0b000110: {
+                    throw new TrapException(RI, "TLB unimplemented");
+                }
+                //wait
+                case 0b100000: {
+                    return;
+                }
+                default: throw new TrapException(RI, "Unknown COP0 CO " + Integer.toBinaryString(op));
+            }
+        } else {
+            int op = (instruction >>> 21) & 0b11111;
+            int rt = (instruction >>> 16) & 0b11111;
+            int rd = (instruction >>> 11) & 0b11111;
+            switch (op) {
+                //mfc0
+                case 0b00000: {
+                    cpu.registers().writeInteger(rt, cpu.registers().readCop0(rd));
+                    return;
+                }
+                //mtc0
+                case 0b00100: {
+                    cpu.registers().writeCop0(rd, cpu.registers().readInteger(rt));
+                    return;
+                }
+                default: throw new TrapException(RI, "Unknown COP0 " + Integer.toBinaryString(op));
+            }
         }
     }
 
@@ -599,7 +767,7 @@ public class MipsInstruction {
                         boolean unorderedCompare = (cond & 0b1) == 0b1;
                         boolean unordered = Float.isNaN(vs1) | Float.isNaN(vs2);
                         if(trapQNaN & unordered) {
-                            throw new TrapException(instruction, 1);
+                            throw new TrapException(FPE);
                         }
                         boolean a;
                         switch ((cond & 0b110) >> 1) {
@@ -688,7 +856,7 @@ public class MipsInstruction {
                                 fd = -1;
                                 break;
                             }
-                            default: throw new IllegalInstructionException(instruction, "Unimplemented SP COP1");
+                            default: throw new TrapException(RI, "Unimplemented SP COP1");
                         }
                         if(fd != -1) {
                             cpu.registers().writeFloat(fd, Float.floatToIntBits(vd));
@@ -716,7 +884,7 @@ public class MipsInstruction {
                         boolean unorderedCompare = (cond & 0b1) == 0b1;
                         boolean unordered = Double.isNaN(vs1) | Double.isNaN(vs2);
                         if(trapQNaN & unordered) {
-                            throw new TrapException(instruction, 1);
+                            throw new TrapException(FPE);
                         }
                         boolean a;
                         switch ((cond & 0b110) >> 1) {
@@ -802,7 +970,7 @@ public class MipsInstruction {
                                 fd = -1;
                                 break;
                             }
-                            default: throw new IllegalInstructionException(instruction, "Unimplemented DP COP1");
+                            default: throw new TrapException(RI, "Unimplemented DP COP1");
                         }
                         if (fd != -1) {
                             long vdi = Double.doubleToLongBits(vd);
@@ -829,11 +997,11 @@ public class MipsInstruction {
                             cpu.registers().writeFloat(fd+1, (int)(vdi>>>32));
                             break;
                         }
-                        default: throw new IllegalInstructionException(instruction, "Unimplemented W COP1");
+                        default: throw new TrapException(RI, "Unimplemented W COP1");
                     }
                     break;
                 }
-                default: throw new IllegalInstructionException(instruction, "Unknown COP1 size");
+                default: throw new TrapException(RI, "Unknown COP1 format");
             }
         } else {
             switch (rs) {
@@ -849,7 +1017,7 @@ public class MipsInstruction {
                     if (rd == 0) {
                         tmp = 0x0300;
                     } else {
-                        throw new IllegalInstructionException(instruction, "Unimplemented COP1 CFCn");
+                        throw new TrapException(RI, "Unimplemented COP1 CFCn");
                     }
                     cpu.registers().writeInteger(rt, tmp);
                     break;
@@ -861,7 +1029,7 @@ public class MipsInstruction {
                 }
                 // CTC1
                 case 0b00110: {
-                    throw new IllegalInstructionException(instruction, "Unimplemented COP1 CTCn");
+                    throw new TrapException(RI, "Unimplemented COP1 CTCn");
                 }
                 // BC1F / BC1T
                 case 0b01000: {
@@ -874,7 +1042,7 @@ public class MipsInstruction {
                     break;
                 }
                 default: {
-                    throw new IllegalInstructionException(instruction, "Unimplemented COP1");
+                    throw new TrapException(RI, "Unimplemented COP1 instruction");
                 }
             }
         }
@@ -980,8 +1148,38 @@ public class MipsInstruction {
             case 0b101010: return "swl " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b101110: return "swr " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b001110: return "xori " + iregs(rt, rs) + ", " + imm;
+            case 0b010000: return toStringCOP0(instruction);
             case 0b010001: return toStringCOP1(instruction);
             default: return invalid(instruction, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
+        }
+    }
+
+    private static String toStringCOP0(int instruction) {
+        boolean co = ((instruction >>> 25) & 0b1) == 0b1;
+        if(co) {
+            int op = instruction & 0b111111;
+            switch (op) {
+                case 0b011111: return "deret";
+                case 0b011000: return "eret";
+                case 0b001000: return "tlbp";
+                case 0b000001: return "tlbr";
+                case 0b000010: return "tlbwi";
+                case 0b000110: return "tlbwr";
+                //wait
+                case 0b100000: return "wait";
+                default: return invalid(instruction, "Unknown COP0 CO " + Integer.toBinaryString(op));
+            }
+        } else {
+            int op = (instruction >>> 21) & 0b11111;
+            int rt = (instruction >>> 16) & 0b11111;
+            int rd = (instruction >>> 11) & 0b11111;
+            switch (op) {
+                //mfc0
+                case 0b00000: return "mfc0 " + ir(rt) + ", $" + rd;
+                //mtc0
+                case 0b00100: return "mtc0 " + ir(rt) + ", $" + rd;
+                default: return invalid(instruction, "Unknown COP0 " + Integer.toBinaryString(op));
+            }
         }
     }
 

@@ -49,13 +49,31 @@ public class MipsRegisters {
             "$f28", "$f29", "$f30", "$f31",
             "<fp_cc>"
     };
+    // mnemonics for coprocessor 0 (only partially implemented)
+    public static final int
+            C0_VADDR = 8, C0_STATUS = 12, C0_CAUSE = 13,
+            C0_EPC = 14, C0_EXHPC = 10; /*exception handler */
+    public static final int COP0_COUNT = 15;
+    public static final int
+            STATUS_INTERRUPT_ENABLED = 0,
+            STATUS_EXCEPTION_LEVEL = 1,
+            STATUS_USER_MODE = 4;
 
     // used by interpreter to detect writes to $pc
     public static final int FLAG_PC_WRITTEN = 0x01;
 
     private final int[] integerRegisters = new int[INTEGER_COUNT];
     private final int[] fpRegisters = new int[FLOAT_COUNT];
+    private final int[] cop0 = new int[COP0_COUNT];
     private int flags = 0;
+
+    public MipsRegisters() {
+        /* bits 15..8 are the interrupt mask */
+        /* bit 4 is the user mode (always 1) */
+        /* bit 1 is the exception level */
+        /* bit 0 is interrupt enable */
+        writeInteger(C0_STATUS, 0x0000ff11);
+    }
 
     public void clearFlags() {
         flags &= ~FLAG_PC_WRITTEN;
@@ -84,6 +102,28 @@ public class MipsRegisters {
 
     public void writeFloat(int register, int value) {
         fpRegisters[register] = value;
+    }
+
+    public int readCop0(int register) {
+        return cop0[register];
+    }
+
+    public void writeCop0(int register, int value) {
+        if(register == C0_STATUS) {
+            //always set the user mode bit
+            value |= 1 << STATUS_USER_MODE;
+        }
+        cop0[register] = value;
+    }
+
+    public boolean readStatusBit(int bit) {
+        return ((readCop0(C0_STATUS) >> bit) & 0b1) == 0b1;
+    }
+
+    public void writeStatusBit(int bit, boolean value) {
+        int s = readCop0(C0_STATUS);
+        s ^= (-(value ? 1 : 0) ^ s) & (1 << bit);
+        writeCop0(C0_STATUS, s);
     }
 
     public boolean readFloatCondition(int cc) {

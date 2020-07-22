@@ -1,7 +1,9 @@
 package com.github.natanbc.mipscpu;
 
+import com.github.natanbc.mipscpu.instruction.InstructionExecutionException;
 import com.github.natanbc.mipscpu.instruction.MipsInstruction;
 import com.github.natanbc.mipscpu.instruction.SyscallHandler;
+import com.github.natanbc.mipscpu.instruction.TrapException;
 import com.github.natanbc.mipscpu.memory.MemoryOperationException;
 import com.github.natanbc.mipscpu.memory.MemoryHandler;
 import com.github.natanbc.mipscpu.memory.MemoryMap;
@@ -9,6 +11,8 @@ import com.github.natanbc.mipscpu.memory.MemoryMap;
 import java.util.NavigableMap;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
+import static com.github.natanbc.mipscpu.MipsRegisters.PC;
 
 public class MipsCPU {
     private static final int BYTE_MASK = 0b11;
@@ -64,12 +68,9 @@ public class MipsCPU {
 
     public void step() throws MipsException {
         registers.clearFlags();
-        //haha icache go brrrr
-        //jk we don't have those fancy things here
-        //we're a simple cpu
-        MipsInstruction.execute(this, readWord(registers.readInteger(MipsRegisters.PC)));
+        step0();
         if(!registers.wasPcWritten()) {
-            registers.writeInteger(MipsRegisters.PC, registers.readInteger(MipsRegisters.PC) + 4);
+            registers.writeInteger(PC, registers.readInteger(PC) + 4);
         }
     }
 
@@ -147,6 +148,41 @@ public class MipsCPU {
             return null;
         }
         return handler;
+    }
+
+    private void step0() throws MipsException {
+        //haha icache go brrrr
+        //jk we don't have those fancy things here
+        //we're a simple cpu
+        try {
+            int instruction;
+            try {
+                instruction = readWord(registers.readInteger(PC));
+            } catch (MemoryOperationException e) {
+                throw new TrapException(TrapException.Cause.IBE);
+            }
+            //System.out.printf("exec: %s\n", MipsInstruction.toString(instruction));
+            MipsInstruction.execute(this, instruction);
+        } catch (TrapException e) {
+            //syscall
+            if(e.getTrapCause() == TrapException.Cause.Sys) {
+                if(syscallHandler == null) {
+                    throw new InstructionExecutionException("No syscall handler set!");
+                }
+                //the handler must update PC if it throws for a non error reason
+                //such as stopping a loop calling step(), where the syscall instruction
+                //shouldn't be executed again
+                syscallHandler.handleSyscall(this);
+                return;
+            }
+            if(registers.readStatusBit(MipsRegisters.STATUS_EXCEPTION_LEVEL)) {
+                throw e;
+            }
+            registers.writeCop0(MipsRegisters.C0_EPC, registers.readInteger(MipsRegisters.PC));
+            registers.writeCop0(MipsRegisters.C0_CAUSE, e.getTrapCause().getCode());
+            registers.writeStatusBit(MipsRegisters.STATUS_EXCEPTION_LEVEL, true);
+            registers.writeInteger(MipsRegisters.PC, registers.readCop0(MipsRegisters.C0_EXHPC));
+        }
     }
 
     private boolean isRAM(int address) {
