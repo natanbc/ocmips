@@ -173,6 +173,12 @@ public class MipsArchitecture implements Architecture {
                     cpu.registers().writeFloat(i, fpregs[i]);
                 }
             }
+            {
+                int[] cop0regs = tag.getIntArray("mips_cop0regs");
+                for(int i = 0; i < cop0regs.length; i++) {
+                    cpu.registers().writeCop0(i, cop0regs[i]);
+                }
+            }
             HandlerSerialization.deserializeHandlers(machine, cpu, tag);
         }
     }
@@ -193,6 +199,13 @@ public class MipsArchitecture implements Architecture {
                 int[] fpregs = new int[MipsRegisters.FLOAT_COUNT];
                 for(int i = 0; i < fpregs.length; i++) fpregs[i] = cpu.registers().readFloat(i);
                 tag.setIntArray("mips_fpregisters", fpregs);
+            }
+            {
+                int[] cop0 = new int[MipsRegisters.COP0_COUNT];
+                for(int i = 0; i < cop0.length; i++) {
+                    cop0[i] = cpu.registers().readCop0(i);
+                }
+                tag.setIntArray("mips_cop0regs", cop0);
             }
             try {
                 HandlerSerialization.serializeHandlers(cpu, tag);
