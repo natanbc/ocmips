@@ -118,7 +118,7 @@ public class EEPROMHandler implements MemoryHandler {
         }
         //writing to dirty/size/dataSize does nothing
         if(address == base + 4 || address == base + 8 || address == base + 12) {
-            return;
+            throw new MemoryOperationException(address, MemoryOperationException.Reason.READ_ONLY);
         }
         dirty = true;
         int offset = address - base - 16;

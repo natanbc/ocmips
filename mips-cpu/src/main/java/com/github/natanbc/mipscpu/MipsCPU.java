@@ -161,7 +161,6 @@ public class MipsCPU {
             } catch (MemoryOperationException e) {
                 throw new TrapException(TrapException.Cause.IBE);
             }
-            //System.out.printf("exec: %s\n", MipsInstruction.toString(instruction));
             MipsInstruction.execute(this, instruction);
         } catch (TrapException e) {
             //exceptions always fail atomic updates
