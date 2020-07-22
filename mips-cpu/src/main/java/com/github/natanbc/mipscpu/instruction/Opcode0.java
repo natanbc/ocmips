@@ -210,6 +210,41 @@ class Opcode0 {
                 }
                 return;
             }
+            //tge
+            case 0b110000: {
+                if(cpu.registers().readInteger(rs) >= cpu.registers().readInteger(rt)) {
+                    throw new TrapException(Tr);
+                }
+                return;
+            }
+            //tgeu
+            case 0b110001: {
+                if(Integer.compareUnsigned(cpu.registers().readInteger(rs), cpu.registers().readInteger(rt)) >= 0) {
+                    throw new TrapException(Tr);
+                }
+                return;
+            }
+            //tlt
+            case 0b110010: {
+                if(cpu.registers().readInteger(rs) < cpu.registers().readInteger(rt)) {
+                    throw new TrapException(Tr);
+                }
+                return;
+            }
+            //tltu
+            case 0b110011: {
+                if(Integer.compareUnsigned(cpu.registers().readInteger(rs), cpu.registers().readInteger(rt)) < 0) {
+                    throw new TrapException(Tr);
+                }
+                return;
+            }
+            //tne
+            case 0b110110: {
+                if(cpu.registers().readInteger(rs) != cpu.registers().readInteger(rt)) {
+                    throw new TrapException(Tr);
+                }
+                return;
+            }
             //xor
             case 0b100110: {
                 cpu.registers().writeInteger(rd,
@@ -256,6 +291,11 @@ class Opcode0 {
             case 0b001111: return "sync"; // or as i like to call it, fancy nop
             case 0b001100: return "syscall";
             case 0b110100: return "teq " + iregs(rs, rt);
+            case 0b110000: return "tge " + iregs(rs, rt);
+            case 0b110001: return "tgeu " + iregs(rs, rt);
+            case 0b110010: return "tlt " + iregs(rs, rt);
+            case 0b110011: return "tltu " + iregs(rs, rt);
+            case 0b110110: return "tne " + iregs(rs, rt);
             case 0b100110: return "xor " + iregs(rd, rs, rt);
             default: return invalid(instruction, "Unknown func " + func);
         }

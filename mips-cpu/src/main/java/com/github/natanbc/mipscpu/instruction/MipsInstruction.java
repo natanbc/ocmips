@@ -54,6 +54,11 @@ public class MipsInstruction {
         //andi, ori, xori, lui must NOT be sign extended
         //addi[u], lw, sw, relative branches, slti[u] must be sign extended
         switch (instruction >>> 26) {
+            //regimm
+            case 0b000001: {
+                RegImm.execute(cpu, instruction);
+                return;
+            }
             //addi
             case 0b001000: {
                 int a = cpu.registers().readInteger(rs);
@@ -83,41 +88,6 @@ public class MipsInstruction {
                 }
                 return;
             }
-            //bgez, bgezal, bltz, bltzal
-            case 0b000001:
-                switch(rt) {
-                    //bgez
-                    case 0b00001: {
-                        if(cpu.registers().readInteger(rs) >= 0) {
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
-                        }
-                        return;
-                    }
-                    //bgezal
-                    case 0b10001: {
-                        if(cpu.registers().readInteger(rs) >= 0) {
-                            cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
-                        }
-                        return;
-                    }
-                    //bltz
-                    case 0b00000: {
-                        if(cpu.registers().readInteger(rs) < 0) {
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
-                        }
-                        return;
-                    }
-                    //bltzal
-                    case 0b10000: {
-                        if(cpu.registers().readInteger(rs) < 0) {
-                            cpu.registers().writeInteger(RA, cpu.registers().readInteger(PC) + 8);
-                            cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(imm) << 2));
-                        }
-                        return;
-                    }
-                    default: throw new TrapException(RI, "Unknown branch type " + Integer.toBinaryString(rt));
-                }
             //bgtz
             case 0b000111: {
                 if(cpu.registers().readInteger(rs) > 0) {
@@ -477,18 +447,11 @@ public class MipsInstruction {
         //andi, ori, xori must NOT be sign extended
         //addi[u], lw, sw, relative branches, slti[u] must be sign extended
         switch (instruction >>> 26) {
+            case 0b000001: return RegImm.toString(instruction);
             case 0b001000: return "addi " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b001001: return "addiu " + iregs(rt, rs) + ", " + signExtend(imm);
             case 0b001100: return "andi " + iregs(rt, rs) + ", " + imm;
             case 0b000100: return "beq " + iregs(rs, rt) + ", " + signExtend(imm);
-            case 0b000001:
-                switch (rt) {
-                    case 0b00001: return "bgez " + ir(rs) + ", " + signExtend(imm);
-                    case 0b10001: return "bgezal " + ir(rs) + ", " + signExtend(imm);
-                    case 0b00000: return "bltz " + ir(rs) + ", " + signExtend(imm);
-                    case 0b10000: return "bltzal " + ir(rs) + ", " + signExtend(imm);
-                    default: return invalid(instruction, "Unknown branch type " + Integer.toBinaryString(rt));
-                }
             case 0b000111: return "bgtz " + ir(rs) + ", " + signExtend(imm);
             case 0b000110: return "blez " + ir(rs) + ", " + signExtend(imm);
             case 0b000101: return "bne " + iregs(rs, rt) + ", " + signExtend(imm);
