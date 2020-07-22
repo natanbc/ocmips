@@ -164,6 +164,8 @@ public class MipsCPU {
             //System.out.printf("exec: %s\n", MipsInstruction.toString(instruction));
             MipsInstruction.execute(this, instruction);
         } catch (TrapException e) {
+            //exceptions always fail atomic updates
+            registers.endAtomicUpdate();
             //syscall
             if(e.getTrapCause() == TrapException.Cause.Sys) {
                 if(syscallHandler == null) {
