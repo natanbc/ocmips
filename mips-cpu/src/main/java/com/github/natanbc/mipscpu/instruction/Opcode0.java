@@ -7,7 +7,7 @@ import static com.github.natanbc.mipscpu.MipsRegisters.*;
 import static com.github.natanbc.mipscpu.instruction.MipsInstruction.*;
 import static com.github.natanbc.mipscpu.instruction.TrapException.Cause.*;
 
-public class Opcode0 {
+class Opcode0 {
     static void execute(MipsCPU cpu, int instruction) throws MipsException {
         int func =   instruction & 0b111111;
         int rd =    (instruction << 16) >>> 27;

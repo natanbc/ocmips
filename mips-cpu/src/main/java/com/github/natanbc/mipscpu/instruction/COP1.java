@@ -7,7 +7,7 @@ import static com.github.natanbc.mipscpu.MipsRegisters.*;
 import static com.github.natanbc.mipscpu.instruction.MipsInstruction.*;
 import static com.github.natanbc.mipscpu.instruction.TrapException.Cause.*;
 
-public class COP1 {
+class COP1 {
     //i fear no man
     //but that thing
     //it scares me

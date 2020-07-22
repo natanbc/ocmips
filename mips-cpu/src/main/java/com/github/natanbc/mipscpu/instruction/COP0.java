@@ -7,7 +7,7 @@ import static com.github.natanbc.mipscpu.MipsRegisters.*;
 import static com.github.natanbc.mipscpu.instruction.MipsInstruction.*;
 import static com.github.natanbc.mipscpu.instruction.TrapException.Cause.*;
 
-public class COP0 {
+class COP0 {
     static void execute(MipsCPU cpu, int instruction) throws MipsException {
         boolean co = ((instruction >>> 25) & 0b1) == 0b1;
         if(co) {
