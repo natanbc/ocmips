@@ -56,13 +56,15 @@ public class OCMips {
         try(InputStream is = openResource("bios.bin")) {
             ItemStack bios = Items.registerEEPROM("EEPROM (MIPS Bios)",
                     IOUtils.toByteArray(is), null, false);
+            Item item = Objects.requireNonNull(
+                    Item.getByNameOrId("opencomputers:storage"),
+                    "Unable to find opencomputers:storage item"
+            );
             GameRegistry.addShapelessRecipe(
                     new ResourceLocation(MOD_ID, "bios"),
                     null,
                     bios,
-                    Ingredient.fromItem(Objects.requireNonNull(Item.REGISTRY.getObject(new ResourceLocation(
-                            "opencomputers", "eeprom"
-                    )), "Unable to find opencomputers eeprom item!")),
+                    Ingredient.fromStacks(new ItemStack(item, 1, 0)),
                     Ingredient.fromItem(net.minecraft.init.Items.REDSTONE)
             );
         }
