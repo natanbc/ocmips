@@ -5,7 +5,7 @@
 typedef int address_t[4];
 
 #define MEMORY_MAP(_T,_N,_A) \
-    volatile _T* _N = (volatile _T*) (_A)
+    static volatile _T* _N = (volatile _T*) (_A)
 
 #define RT_ASSERT_OK(cond) \
     do { if((cond)!=0) { rt_bsod(0, "Call " #cond " failed"); } } while(0)
