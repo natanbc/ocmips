@@ -93,25 +93,25 @@ class COP1 {
                             case 0b000111: vd = -vs1; break;
                             // CEIL.W.S
                             case 0b001110: {
-                                cpu.registers().writeInteger(fd, truncToFixed(Math.ceil(vs1)));
+                                cpu.registers().writeFloat(fd, truncToFixed(Math.ceil(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // FLOOR.W.S
                             case 0b001111: {
-                                cpu.registers().writeInteger(fd, truncToFixed(Math.floor(vs1)));
+                                cpu.registers().writeFloat(fd, truncToFixed(Math.floor(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // ROUND.W.S
                             case 0b001100: {
-                                cpu.registers().writeInteger(fd, truncToFixed(Math.round(vs1)));
+                                cpu.registers().writeFloat(fd, truncToFixed(Math.round(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // TRUNC.W.S
                             case 0b001101: {
-                                cpu.registers().writeInteger(fd, truncToFixed(vs1));
+                                cpu.registers().writeFloat(fd, truncToFixed(vs1));
                                 fd = -1;
                                 break;
                             }
@@ -210,25 +210,25 @@ class COP1 {
                             case 0b000111: vd = -vs1; break;
                             // CEIL.W.D
                             case 0b001110: {
-                                cpu.registers().writeInteger(fd, truncToFixed(Math.ceil(vs1)));
+                                cpu.registers().writeFloat(fd, truncToFixed(Math.ceil(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // FLOOR.W.D
                             case 0b001111: {
-                                cpu.registers().writeInteger(fd, truncToFixed(Math.floor(vs1)));
+                                cpu.registers().writeFloat(fd, truncToFixed(Math.floor(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // ROUND.W.D
                             case 0b001100: {
-                                cpu.registers().writeInteger(fd, truncToFixed(Math.round(vs1)));
+                                cpu.registers().writeFloat(fd, truncToFixed(Math.round(vs1)));
                                 fd = -1;
                                 break;
                             }
                             // TRUNC.W.D
                             case 0b001101: {
-                                cpu.registers().writeInteger(fd, truncToFixed(vs1));
+                                cpu.registers().writeFloat(fd, truncToFixed(vs1));
                                 fd = -1;
                                 break;
                             }
