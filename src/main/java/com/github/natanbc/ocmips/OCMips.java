@@ -1,28 +1,45 @@
 package com.github.natanbc.ocmips;
 
 import com.github.natanbc.ocmips.utils.MemoryUtils;
+import li.cil.oc.api.Items;
 import li.cil.oc.api.Machine;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.crafting.Ingredient;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.registry.GameRegistry;
 import org.apache.commons.compress.utils.IOUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.Objects;
 
-@Mod(modid = "ocmips", name = "OCMIPS",
+@Mod(modid = OCMips.MOD_ID, name = "OCMIPS",
         version = "1.0",
         dependencies = "required-after:opencomputers@[1.7.0,)"
 )
 public class OCMips {
+    public static final String MOD_ID = "ocmips";
+
     static int[] BOOTROM;
+
+    public static InputStream openResource(String name) {
+        InputStream is = OCMips.class.getClassLoader().getResourceAsStream("assets/" + MOD_ID + "/" + name);
+        if(is == null) {
+            throw new IllegalArgumentException(name + " not found");
+        }
+        return is;
+    }
     
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent ev) throws IOException {
         Machine.add(MipsArchitecture.class);
-        try(InputStream is = getClass().getClassLoader().getResourceAsStream("assets/ocmips/bootrom.bin")) {
-            if(is == null) throw new AssertionError("bootrom.bin not found");
+        try(InputStream is = openResource("bootrom.bin")) {
             byte[] rom = IOUtils.toByteArray(is);
             IntBuffer data = ((ByteBuffer)
                     MemoryUtils.allocateRounding(rom.length)
@@ -31,6 +48,23 @@ public class OCMips {
                     .asIntBuffer();
             BOOTROM = new int[data.remaining()];
             data.get(BOOTROM);
+        }
+    }
+
+    @Mod.EventHandler
+    public void init(FMLInitializationEvent ev) throws IOException {
+        try(InputStream is = openResource("bios.bin")) {
+            ItemStack bios = Items.registerEEPROM("EEPROM (MIPS Bios)",
+                    IOUtils.toByteArray(is), null, false);
+            GameRegistry.addShapelessRecipe(
+                    new ResourceLocation(MOD_ID, "bios"),
+                    null,
+                    bios,
+                    Ingredient.fromItem(Objects.requireNonNull(Item.REGISTRY.getObject(new ResourceLocation(
+                            "opencomputers", "eeprom"
+                    )), "Unable to find opencomputers eeprom item!")),
+                    Ingredient.fromItem(net.minecraft.init.Items.REDSTONE)
+            );
         }
     }
 }
