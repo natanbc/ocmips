@@ -109,6 +109,10 @@ public class MipsInstruction {
                 }
                 return;
             }
+            //cache
+            case 0b101111: {
+                return;
+            }
             //lb
             case 0b100000: {
                 int address = cpu.registers().readInteger(rs) + signExtend(imm);
@@ -436,6 +440,14 @@ public class MipsInstruction {
                 COP1.execute(cpu, instruction);
                 return;
             }
+            //COP2
+            case 0b010010:
+            //lwc2
+            case 0b110010:
+            //swc2
+            case 0b111010: {
+                throw new TrapException(CpU);
+            }
             default: throw new TrapException(RI, "Unknown opcode " + Integer.toBinaryString(instruction >>> 26));
         }
     }
@@ -455,6 +467,7 @@ public class MipsInstruction {
             case 0b000111: return "bgtz " + ir(rs) + ", " + signExtend(imm);
             case 0b000110: return "blez " + ir(rs) + ", " + signExtend(imm);
             case 0b000101: return "bne " + iregs(rs, rt) + ", " + signExtend(imm);
+            case 0b101111: return "cache " + rt + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100000: return "lb " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b100100: return "lbu " + ir(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";
             case 0b110101: return "ldc1 " + fr(rt) + ", " + signExtend(imm) + "(" + ir(rs) + ")";

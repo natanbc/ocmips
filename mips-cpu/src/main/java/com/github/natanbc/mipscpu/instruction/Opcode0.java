@@ -278,7 +278,13 @@ class Opcode0 {
             case 0b011001: return "multu " + iregs(rs, rt);
             case 0b100111: return "nor " + iregs(rd, rs, rt);
             case 0b100101: return "or " + iregs(rd, rs, rt);
-            case 0b000000: return "sll " + iregs(rd, rt) + ", " + shamt;
+            case 0b000000: {
+                //sll is also used as nop and ssnop
+                if(rd == ZERO && rt == ZERO && (shamt == 0 || shamt == 1)) {
+                    return shamt == 0 ? "nop" : "ssnop";
+                }
+                return "sll " + iregs(rd, rt) + ", " + shamt;
+            }
             case 0b000100: return "sllv " + iregs(rd, rs, rt);
             case 0b101010: return "slt " + iregs(rd, rs, rt);
             case 0b101011: return "sltu " + iregs(rd, rs, rt);
