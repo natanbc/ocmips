@@ -8,6 +8,11 @@ import static com.github.natanbc.mipscpu.instruction.MipsInstruction.*;
 import static com.github.natanbc.mipscpu.instruction.TrapException.Cause.*;
 
 class COP1 {
+    private static final String[] COMPARE_CONDITIONS = {
+            "f",  "un",   "eq",  "ueq", "olt", "ult", "ole", "ule",
+            "sf", "ngle", "seq", "ngl", "lt",  "nge", "le",  "ngt"
+    };
+
     //i fear no man
     //but that thing
     //it scares me
@@ -311,7 +316,7 @@ class COP1 {
                     int offset = instruction & 0xFFFF;
                     boolean tf = ((instruction >>> 16) & 0b1) == 0b1;
                     if(cpu.registers().readFloatCondition(cc) == tf) {
-                        cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (offset << 2));
+                        cpu.registers().writeInteger(PC, cpu.registers().readInteger(PC) + 4 + (signExtend(offset) << 2));
                     }
                     break;
                 }
@@ -334,6 +339,11 @@ class COP1 {
             switch (rs) {
                 //SP
                 case 0b10000: {
+                    if((otyp1 & 0b110000) == 0b110000) {
+                        int cc = (instruction>>8)&0b111;
+                        int cond = otyp1 & 0b1111;
+                        return "c." + COMPARE_CONDITIONS[cond] + ".s " + cc + ", " + fregs(fs, ft);
+                    }
                     switch (otyp1) {
                         case 0b000000: return "add.s " + fregs(fd, fs, ft);
                         case 0b000001: return "sub.s " + fregs(fd, fs, ft);
@@ -354,6 +364,11 @@ class COP1 {
                 }
                 //DP
                 case 0b10001: {
+                    if((otyp1 & 0b110000) == 0b110000) {
+                        int cc = (instruction>>8)&0b111;
+                        int cond = otyp1 & 0b1111;
+                        return "c." + COMPARE_CONDITIONS[cond] + ".d " + cc + ", " + fregs(fs, ft);
+                    }
                     switch (otyp1) {
                         case 0b000000: return "add.d " + fregs(fd, fs, ft);
                         case 0b000001: return "sub.d " + fregs(fd, fs, ft);
@@ -384,10 +399,10 @@ class COP1 {
             }
         } else {
             switch (rs) {
-                // MFCn
-                case 0: return "mfc1 " + ir(rt) + ", " + fr(fs);
-                // CFCn
-                case 2: {
+                // MFC1
+                case 0b00000: return "mfc1 " + ir(rt) + ", " + fr(fs);
+                // CFC1
+                case 0b00010: {
                     // FCR0: Revision
                     if (rd == 0) {
                         return "cfc1 " + ir(rt) + ", FIR";
@@ -395,11 +410,18 @@ class COP1 {
                         return invalid(instruction, "Unimplemented COP1 CFCn");
                     }
                 }
-                // MTCn
-                case 4: return "mtc1 " + fr(fs) + ", " + ir(rt);
-                // CTCn
-                case 6: {
+                // MTC1
+                case 0b00100: return "mtc1 " + fr(fs) + ", " + ir(rt);
+                // CTC1
+                case 0b00110: {
                     return invalid(instruction, "Unimplemented COP1 CTCn");
+                }
+                // BC1F / BC1T
+                case 0b01000: {
+                    int cc = (instruction >>> 18) & 0b111;
+                    int offset = instruction & 0xFFFF;
+                    boolean tf = ((instruction >>> 16) & 0b1) == 0b1;
+                    return (tf ? "bc1t" : "bc1f") + " " + cc + ", " + signExtend(offset);
                 }
                 default: {
                     return invalid(instruction, "Unimplemented COP1");
