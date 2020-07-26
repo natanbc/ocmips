@@ -440,6 +440,22 @@ public class MipsArchitecture implements Architecture {
                     cpu.registers().writeFloat(MipsRegisters.F0, Float.floatToIntBits((float)machine.upTime()));
                     return;
                 }
+                //unmap and jump
+                //$a0 has the address to unmap
+                //$a1 has the address to jump to
+                //$a2 and $a3 are moved to $a0 and $a1 before calling
+                case 13: {
+                    int addr = cpu.registers().readInteger(MipsRegisters.A0);
+                    MemoryHandler m = cpu.removeMemoryHandler(addr);
+                    if(m instanceof CleanableHandler) {
+                        ((CleanableHandler)m).cleanup(cpu);
+                    }
+                    int call = cpu.registers().readInteger(MipsRegisters.A1);
+                    cpu.registers().writeInteger(MipsRegisters.A0, cpu.registers().readInteger(MipsRegisters.A2));
+                    cpu.registers().writeInteger(MipsRegisters.A1, cpu.registers().readInteger(MipsRegisters.A3));
+                    cpu.registers().writeInteger(MipsRegisters.PC, call);
+                    return;
+                }
                 default: cpu.registers().writeInteger(MipsRegisters.V0, -1);
             }
         });
