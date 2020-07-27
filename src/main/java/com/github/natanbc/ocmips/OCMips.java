@@ -1,9 +1,10 @@
 package com.github.natanbc.ocmips;
 
 import com.github.natanbc.ocmips.utils.MemoryUtils;
+import li.cil.oc.api.FileSystem;
 import li.cil.oc.api.Items;
 import li.cil.oc.api.Machine;
-import net.minecraft.item.Item;
+import net.minecraft.item.EnumDyeColor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.util.ResourceLocation;
@@ -17,7 +18,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.Objects;
 
 @Mod(modid = OCMips.MOD_ID, name = "OCMIPS",
         version = "1.0",
@@ -56,17 +56,22 @@ public class OCMips {
         try(InputStream is = openResource("bios.bin")) {
             ItemStack bios = Items.registerEEPROM("EEPROM (MIPS Bios)",
                     IOUtils.toByteArray(is), null, false);
-            Item item = Objects.requireNonNull(
-                    Item.getByNameOrId("opencomputers:storage"),
-                    "Unable to find opencomputers:storage item"
-            );
             GameRegistry.addShapelessRecipe(
                     new ResourceLocation(MOD_ID, "bios"),
                     null,
                     bios,
-                    Ingredient.fromStacks(new ItemStack(item, 1, 0)),
+                    Ingredient.fromStacks(Items.get("eeprom").createItemStack(1)),
                     Ingredient.fromItem(net.minecraft.init.Items.REDSTONE)
             );
         }
+        GameRegistry.addShapelessRecipe(
+                new ResourceLocation(MOD_ID, "flashhex"),
+                null,
+                Items.registerFloppy("flashhex", EnumDyeColor.CYAN,
+                        () -> FileSystem.fromClass(OCMips.class, MOD_ID, "flash"),
+                        true),
+                Ingredient.fromStacks(Items.get("floppy").createItemStack(1)),
+                Ingredient.fromItem(net.minecraft.init.Items.REDSTONE)
+        );
     }
 }
