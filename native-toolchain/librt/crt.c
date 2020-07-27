@@ -1,6 +1,6 @@
 #include "crt.h"
 
-void* memcpy(void* dest, const void* src, unsigned int n) {
+void* memcpy(void* dest, const void* src, size_t n) {
     char* d = dest;
     const char* s = src;
     while(n != 0) {
@@ -13,7 +13,7 @@ void* memcpy(void* dest, const void* src, unsigned int n) {
 }
 
 
-void* memset(void* dst, int c, unsigned int length) {
+void* memset(void* dst, int c, size_t length) {
     char* s = (char*)dst;
     while(length-- != 0) {
         *s++ = (char) c;
@@ -21,7 +21,7 @@ void* memset(void* dst, int c, unsigned int length) {
     return dst;
 }
 
-int strncmp(const char* a, const char* b, unsigned int n) {
+int strncmp(const char* a, const char* b, size_t n) {
     while(n != 0 && *a != 0 && (*a == *b)) {
         a++;
         b++;

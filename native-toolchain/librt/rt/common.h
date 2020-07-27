@@ -14,22 +14,97 @@ typedef struct { int words[4]; } address_t;
 extern "C" {
 #endif
 
+/**
+ * Sleeps for a given amount of minecraft ticks. A minecraft tick
+ * is equivalent to 0.05 seconds. Immediately returns if there are
+ * queued signals, and returns early if a signal is queued during sleep.
+ *
+ * Use rt_pull_signal and/or rt_uptime to sleep for a fixed amount of time.
+ *
+ * @param ticks Number of ticks to sleep
+ */
 void rt_sleep(int ticks);
 
+/**
+ * Shuts down the machine, optionally rebooting it.
+ *
+ * If `reboot` is anything other than 0, the machine reboots.
+ *
+ * Never returns.
+ *
+ * @param reboot Whether or not the machine should reboot.
+ */
 void rt_shutdown(int reboot);
 
+/**
+ * Unmaps a memory map. The given address must be the base address
+ * of the memory map.
+ *
+ * @param addr Address of the memory map to unmap.
+ *
+ * @return 0 on success, anything else on failure.
+ */
 int rt_unmap(volatile void* addr);
 
+/**
+ * Crashes the machine with the given error message, optionally
+ * drawing it to a gpu.
+ *
+ * This function never returns.
+ *
+ * @param gpu Address of the gpu to draw the message on. May be null.
+ * @param msg Error message.
+ */
 void rt_bsod(address_t* gpu, const char* msg);
 
+/**
+ * Writes a debug message with an argument to the game's console.
+ *
+ * This function might be made a noop or gated behind a mod configuration
+ * in the future.
+ *
+ * @param msg  Message to print.
+ * @param type Type of the argument (see rt/ffi.h).
+ * @param val  Bitwise representation of the value (eg a float
+ *             type-punned to an int, or a pointer cast to an int,
+ *             which works because ints are word-sized).
+ */
 void rt_dbg(const char* msg, int type, int val);
 
+/**
+ * Remaps an address range to be interpreted as if it was another region,
+ * such that any reads/writes to [addr, addr + size) are remaped to
+ * [target, target + size).
+ *
+ * @param addr   Base address of the resulting map.
+ * @param target Target region of the map.
+ * @param size   Size of the map.
+ *
+ * @return 0 on success, anything else on failure.
+ */
 int rt_mremap(void* addr, void* target, int size);
 
+/**
+ * Returns the size of the installed ram, in bytes.
+ */
 int rt_ramsize();
 
+/**
+ * Returns the uptime of the machine, in seconds.
+ */
 float rt_uptime();
 
+/**
+ * Unmaps a memory map, then jumps to `fn`, with the first two arguments
+ * being set to `arg1` and `arg2`. The provided function should never return.
+ *
+ * This function never returns.
+ *
+ * @param addr Address to unmap. Unmap failures are ignored.
+ * @param fn   Address of the function to jump to.
+ * @param arg1 First argument for the function.
+ * @param arg2 Second argument for the function.
+ */
 void rt_unmap_and_jump(volatile void* addr, void* fn, int arg1, int arg2);
 
 #ifdef __cplusplus
@@ -38,6 +113,8 @@ void rt_unmap_and_jump(volatile void* addr, void* fn, int arg1, int arg2);
 
 #ifdef __cplusplus
 #include "rt/ffi.h"
+
+//C++ overloads of rt_dbg
 
 template<typename T>
 inline void rt_dbg(const char* msg, T val);
