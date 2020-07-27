@@ -20,6 +20,10 @@
 #define RET_SIZE_BOOLEAN        RET_SIZE_INTEGER
 #define RET_SIZE_BYTEARRAY(len) (sizeof(component_method_ret_t)+sizeof(int)+align_up((len), 4))
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     unsigned int len;
     uint8_t data[];
@@ -52,3 +56,51 @@ int rt_map_component(volatile component_method_t* addr, address_t* component, co
 
 int rt_pull_signal(void* ret_buf, int ret_buf_size);
 
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+
+#include <stdarg.h>
+
+class method {
+private:
+    volatile component_method_t* m;
+public:
+    method(int addr, address_t* c, const char* name, int max_args) {
+        m = (volatile component_method_t*)addr;
+        if(rt_map_component(m, c, name, max_args) != 0) m = nullptr;
+    }
+
+    ~method() {
+        rt_unmap(m);
+    }
+
+    inline operator bool() const {
+        return m != nullptr;
+    }
+
+    void configure_args(int argc, ...) {
+        m->argc = argc;
+        va_list args;
+        va_start(args, argc);
+        for(int i = 0; i < argc; i++) {
+            m->args[i].type = va_arg(args, int);
+        }
+        va_end(args);
+    }
+
+    void operator() (int argc, ...) {
+        va_list args;
+        va_start(args, argc);
+        for(int i = 0; i < argc; i++) m->args[i].value = va_arg(args, int);
+        va_end(args);
+
+        rt_call_method(m);
+    }
+
+    inline volatile component_method_t* operator->() { return m; }
+};
+
+#endif

@@ -17,7 +17,10 @@ override CXX :=     $(call override_default,CXX,clang++-10)
 override LD :=      $(call override_default,LD,ld.lld-10)
 override LLC :=     $(call override_default,LLC,llc-10)
 override OBJCOPY := $(call override_default,OBJCOPY,llvm-objcopy-10)
+override OBJDUMP := $(call override_default,OBJDUMP,llvm-objdump-10)
 override RUSTC :=   $(call override_default,RUSTC,rustc)
+override SIZE :=    $(call override_default,SIZE,llvm-size-10)
+override XXD :=     $(call override_default,XXD,xxd)
 
 RAM_START=0x50000000
 STACK_SIZE=0x8000
@@ -72,7 +75,7 @@ ifdef PROJECT
   override CFLAGS += \
       ${BASE_FLAGS} -fdata-sections -ffunction-sections -Ilibrt
   override CXXFLAGS += \
-	  ${CFLAGS}
+	  ${CFLAGS} -fno-exceptions -fno-rtti
   override LDFLAGS += \
       --image-base=${BASE} --section-start=.text=${BASE} --gc-sections \
       --script ${LD_SCRIPT} --defsym=BASE_ADDR=${BASE}
@@ -118,6 +121,12 @@ $(BIN_PATH)%.cpp.o: $(SRC_PATH)%.cpp
 
 setup:
 	mkdir -p $(BIN_PATH)
+size: $(PROJECT_NAME).elf
+	$(SIZE) $(ELF_FILE)
+xxd: $(RESULT)
+	$(XXD) -ps $(BIN_PATH)$(RESULT)
+dump: $(PROJECT_NAME).elf
+	$(OBJDUMP) -D -j .text -j .data -j .bss $(ELF_FILE)
 
 $(PROJECT_NAME).elf: setup librt_target $(OBJ_PATHS)
 	$(LD) $(LDFLAGS) -o $(ELF_FILE) $(LIBS) $(OBJ_PATHS)

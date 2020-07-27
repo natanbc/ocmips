@@ -85,3 +85,10 @@ rt_uptime: .globl rt_uptime
     li $v0, 12
     syscall
     jr $ra
+
+# void rt_unmap_and_jump(volatile void* addr, void* fn, int arg1, int arg2);
+.section .text.rt_unmap_and_jump
+rt_unmap_and_jump: .globl rt_unmap_and_jump
+    li $v0, 13
+    syscall
+    # no return
