@@ -13,3 +13,10 @@ Probably not
 ## Did you get a good grade
 
 Yes
+
+## Can it play bad apple?
+
+Yes
+
+* [Code](https://github.com/natanbc/ocmips/tree/master/native-toolchain/projects/nadeshicodec)
+* [Video](https://youtu.be/jto-vU8q3lA)
